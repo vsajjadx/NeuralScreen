@@ -131,19 +131,23 @@ def main():
     # Loading ROOT/config.json would migrate and rewrite that personal file as
     # soon as a new product-default field is added.
     cfg = settings_io.load_config(ROOT / "config.default.json")
-    cfg.update(frame_generation=True, frame_multiplier=4, ui_detection=True)
+    cfg.update(frame_generation=True, frame_multiplier=protocol.FG_MULTIPLIER_MAX, ui_detection=True)
     params = settings_io.resolve_params(cfg)
     data = dict(cfg)
     data.update(settings_io._menu_layout_payload(cfg, params,
         cfg["monitor"] if isinstance(cfg["monitor"], int) else 0,
         cfg["lang"], cfg["work_scale"], 0.0, True, bool(cfg.get("nr_small")), menu))
-    assert data["frame_generation"] and data["frame_multiplier"] == 4
+    assert data["frame_generation"] and data["frame_multiplier"] == protocol.FG_MULTIPLIER_MAX
     with tempfile.TemporaryDirectory() as temp:
         path = Path(temp) / "config.json"
         path.write_text(json.dumps(data), encoding="utf-8")
         restored = settings_io.load_config(path)
         assert restored["ui_detection"]
-        assert restored["frame_generation"] and restored["frame_multiplier"] == 4
+        assert restored["frame_generation"] and restored["frame_multiplier"] == protocol.FG_MULTIPLIER_MAX
+        # A config saved by the DLSS-G build (3x..6x) loads at the FSR ceiling.
+        data["frame_multiplier"] = 6
+        path.write_text(json.dumps(data), encoding="utf-8")
+        assert settings_io.load_config(path)["frame_multiplier"] == protocol.FG_MULTIPLIER_MAX
     pygame.quit()
     print("OK: FG controls, multiplier steps, persistence and wire flags")
 
