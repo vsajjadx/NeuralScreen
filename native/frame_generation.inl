@@ -88,11 +88,12 @@ static void FgRuntimeMessage(uint32_t type, const wchar_t *message)
         message != nullptr ? message : L"(no text)");
 }
 
-// The most generated frames per real one. The dispatch description carries
-// four output targets, so FSR frame generation goes to 5x (4 generated frames
-// per real one); a provider that stops lower refuses the step and FgStepDown
-// walks it down, as it always did.
-static constexpr unsigned kFgMaxGenerated = 4;
+// The most generated frames per real one: ONE (2x). The dispatch description
+// carries four output targets, but the SDK 2.3 providers write only outputs[0]
+// and return OK for any count, so a higher step is never refused - it would
+// present frames nobody wrote. Raise with FG_MULTIPLIER_MAX in app/protocol.py
+// when a provider fills more.
+static constexpr unsigned kFgMaxGenerated = 1;
 
 struct FgSlot {
     winrt::com_ptr<ID3D12Resource> real, interpolated[kFgMaxGenerated];

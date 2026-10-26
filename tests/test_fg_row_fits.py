@@ -104,7 +104,7 @@ def main() -> int:
                  if it.kind == "button"
                  and str(it.key).startswith(("frame_multiplier:",
                                              "frame_generation:"))]
-        want_cells = protocol.FG_MULTIPLIER_MAX - 1   # x2 .. x6 (#163, v2.6.0)
+        want_cells = protocol.FG_MULTIPLIER_MAX - 1   # x2 only: FSR makes one generated frame
         if len(cells) != want_cells:
             failures.append(
                 f"the FG row has {len(cells)} cells, expected {want_cells} "
