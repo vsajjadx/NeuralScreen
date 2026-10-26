@@ -95,6 +95,21 @@ static void FgRuntimeMessage(uint32_t type, const wchar_t *message)
 // when a provider fills more.
 static constexpr unsigned kFgMaxGenerated = 1;
 
+// The capture has no engine motion: the field is estimated (CPU DIS or NVOFA) at
+// ~320x180 and stretched to the render size, so it is blocky. FSR trusts the
+// supplied vectors, and a blocky field comes out as a picture cut into tiles.
+// Zero vectors make FSR fall back on its own optical flow (computed at display
+// resolution from the two real frames). Default ON; NS_FG_MOTION=1 hands over
+// the estimated field again, for comparison.
+static bool FgUseZeroMotion()
+{
+    static const bool zero = [] {
+        char value[8] = {};
+        return !(GetEnvironmentVariableA("NS_FG_MOTION", value, sizeof(value)) == 1 && value[0] == '1');
+    }();
+    return zero;
+}
+
 struct FgSlot {
     winrt::com_ptr<ID3D12Resource> real, interpolated[kFgMaxGenerated];
     unsigned count = 1;
@@ -110,6 +125,9 @@ static struct FgState {
     ffxContext context = nullptr;
     uint64_t provider_id = 0;
     VideoTex depth;
+    // All-zero motion, handed to FSR in place of the capture's estimated field
+    // (see FgUseZeroMotion): FSR then derives the motion from its own optical flow.
+    VideoTex zero_mv;
     winrt::com_ptr<ID3D12Resource> output[kFgMaxGenerated];
     // FidelityFX wants a frame id that goes up by exactly one per frame; any
     // other step resets the interpolation. Counted per context.
@@ -245,6 +263,8 @@ static void CloseFgResources()
     g_fg.frame_id = 0;
     if (g_fg.depth.tex) { g_fg.depth.tex->Release(); g_fg.depth.tex = nullptr; }
     if (g_fg.depth.upload) { g_fg.depth.upload->Release(); g_fg.depth.upload = nullptr; }
+    if (g_fg.zero_mv.tex) { g_fg.zero_mv.tex->Release(); g_fg.zero_mv.tex = nullptr; }
+    if (g_fg.zero_mv.upload) { g_fg.zero_mv.upload->Release(); g_fg.zero_mv.upload = nullptr; }
     for (auto &image : g_fg.output) image = nullptr;
     g_fg.w = g_fg.height = 0;
 }
@@ -726,6 +746,15 @@ static bool EnsureFg(VideoState &v, DXGI_FORMAT format)
     std::vector<float> depth(static_cast<size_t>(v.w) * v.hgt, 0.5f);
     if (!FillUpload(g_fg.depth, reinterpret_cast<BYTE *>(depth.data()), v.w * 4, v.hgt) || !BeginCommands()) return false;
     CopyUpload(h.list, g_fg.depth);
+    if (FgUseZeroMotion())
+    {
+        if (!CreateVideoTex(g_fg.zero_mv, v.w, v.hgt, DXGI_FORMAT_R16G16_FLOAT, v.w * 4)) return false;
+        std::vector<BYTE> zeros(static_cast<size_t>(v.w) * v.hgt * 4, 0);
+        if (!FillUpload(g_fg.zero_mv, zeros.data(), v.w * 4, v.hgt)) return false;
+        CopyUpload(h.list, g_fg.zero_mv);
+        auto zb = Transition(g_fg.zero_mv.tex, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+        h.list->ResourceBarrier(1, &zb);
+    }
     auto b = Transition(g_fg.depth.tex, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
     h.list->ResourceBarrier(1, &b);
     if (!WaitFenceValue(h.fence, EndCommands(), 30000)) return false;
@@ -791,7 +820,8 @@ static bool EnsureFg(VideoState &v, DXGI_FORMAT format)
         }
     }
     g_fg.thread = std::thread(FgPresenter);
-    Log("[fg] %ux enabled at %ux%u, format=%u; FSR %s; flat depth and estimated motion (experimental)", g_fg_count + 1, w, height, format, g_fg_provider_name);
+    Log("[fg] %ux enabled at %ux%u, format=%u; FSR %s; flat depth, %s (experimental)", g_fg_count + 1, w, height, format, g_fg_provider_name,
+        FgUseZeroMotion() ? "zero motion (FSR optical flow)" : "estimated motion");
     return true;
 }
 
@@ -968,7 +998,9 @@ static bool FgPresent(VideoState &v, ID3D12Resource *color, D3D12_RESOURCE_STATE
     prepare.cameraFovAngleVertical = 1.0f;
     prepare.viewSpaceToMetersFactor = 1.0f;
     prepare.depth = ffxApiGetResourceDX12(g_fg.depth.tex, FFX_API_RESOURCE_STATE_COMPUTE_READ);
-    prepare.motionVectors = ffxApiGetResourceDX12(v.mv.tex, FFX_API_RESOURCE_STATE_COMPUTE_READ);
+    prepare.motionVectors = ffxApiGetResourceDX12(
+        FgUseZeroMotion() && g_fg.zero_mv.tex ? g_fg.zero_mv.tex : v.mv.tex,
+        FFX_API_RESOURCE_STATE_COMPUTE_READ);
     prepare.cameraPosition[0] = prepare.cameraPosition[1] = prepare.cameraPosition[2] = 0.0f;
     prepare.cameraUp[0] = 0.0f; prepare.cameraUp[1] = 1.0f; prepare.cameraUp[2] = 0.0f;
     prepare.cameraRight[0] = 1.0f; prepare.cameraRight[1] = 0.0f; prepare.cameraRight[2] = 0.0f;
