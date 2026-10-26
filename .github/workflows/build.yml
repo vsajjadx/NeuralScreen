@@ -34,9 +34,16 @@ jobs:
           SDL_AUDIODRIVER: dummy
         run: |
           python -m pip install numpy pygame
+          rc=0
           for t in test_fg_multiplier_stepdown test_framegen_controls test_fg_row_fits test_i18n_translated; do
-            echo "== $t"; python tests/$t.py
+            echo "== $t"
+            if ! python tests/$t.py > "$t.out" 2>&1; then
+              rc=1
+              msg=$(tail -n 8 "$t.out" | tr '\n' '|' | cut -c1-900)
+              echo "::error title=$t failed::$msg"
+            fi
           done
+          exit $rc
       - uses: actions/upload-artifact@v4
         with:
           name: neuralscreen-build
