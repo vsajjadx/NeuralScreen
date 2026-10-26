@@ -1,7 +1,7 @@
 # Experimental desktop frame generation
 
 Off by default. Enable Frame Generation in the processing menu and select
-an output multiplier from 2x to 5x. Requires
+the output multiplier (2x: the SDK 2.3 providers write one generated frame). Requires
 `native/amd_fidelityfx_loader_dx12.dll` and
 `native/amd_fidelityfx_framegeneration_dx12.dll` (AMD FidelityFX SDK 2.3.0,
 AMD-signed), supplied separately from the source repository:
@@ -12,9 +12,9 @@ The backend is AMD FSR Frame Generation. The context is created through the
 FidelityFX API (`ffxCreateContext`) and used without FSR's swap chain proxy
 (`FFX_FRAMEGENERATION_FLAG_NO_SWAPCHAIN_CONTEXT_NOTIFY`): per frame the worker
 calls `ffxConfigure`, the prepare dispatch and the generation dispatch into
-textures it owns, and its own presenter shows them. The multiplier stops at 5x
-because the dispatch carries four output targets; a provider that refuses a step
-is walked down to the one it takes.
+textures it owns, and its own presenter shows them. The multiplier stops at 2x:
+the dispatch carries four output targets, but the SDK 2.3 providers write only
+outputs[0] and accept any count, so a higher step would present unwritten frames.
 
 The runtime picks the newest provider for the GPU: FSR Frame Generation 4.0.1
 (the ML one) needs an AMD Radeon 9000-series GPU, Windows 11 and DirectX 12

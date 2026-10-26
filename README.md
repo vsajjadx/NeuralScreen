@@ -125,8 +125,8 @@ into a bar at the top that stays over a game. The dot is green while NR runs.
   picture stays sharp — the result is composed onto your original frame, so
   text and edges keep full resolution. Turn it off to compare. **NR passes**
   under the slider repeats the pass: an experiment, priced in TECHNICAL.md.
-- **FSR FG** — Frame Generation, off by default, with a ×2-×5 multiplier
-  beside the switch (and on **Num7**). AMD FSR Frame Generation (FidelityFX SDK
+- **FSR FG** — Frame Generation, off by default, at ×2 (the SDK 2.3 providers write
+  a single generated frame), switched on **Num7** or beside the switch. AMD FSR Frame Generation (FidelityFX SDK
   2.3, Frame Generation 4.0.1) in its desktop build: the depth is flat and the motion is estimated, there is no engine
   cooperation, so UI and text can distort — the known cost of the approach.
   The header pairs the two honest rates when they differ: "47 / 111 fps" is
