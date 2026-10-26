@@ -1,7 +1,7 @@
 name: build-native
 on:
   push:
-    branches: [main]
+    branches: [main, fsr-fg-test]
   workflow_dispatch:
 jobs:
   windows:
