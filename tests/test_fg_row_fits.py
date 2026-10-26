@@ -40,7 +40,7 @@ import pygame  # noqa: E402
 
 import protocol  # noqa: E402
 
-FG_LABEL = "DLSS 4.5 FG"
+FG_LABEL = "FSR FG"
 #: The state square the PROCESSING section puts before every caption, plus its
 #: gap - the caption starts that far right of the row.
 SQUARE_SHIFT = 7 + 10

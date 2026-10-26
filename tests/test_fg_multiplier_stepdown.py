@@ -9,9 +9,8 @@ run 2x perfectly well - the multiplier is a preference, not a capability.
 
 Checked here:
 
-* the ceiling is read from what the runtime itself reports
-  (DLSSG.MultiFrameCountMax), so a 2x card is never asked for 4x in the first
-  place;
+* FSR has no multiplier-ceiling query: what adapts is the step-down, driven by
+  an answer this run really got, and the provider that ran is named in the log;
 * a refused create OR evaluation steps the multiplier down instead of failing
   the feature, and 2x is the floor - a refusal there is a real refusal;
 * the request is clamped to the ceiling, so the step that already failed is

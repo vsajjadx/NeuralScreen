@@ -46,8 +46,8 @@
 // The default signer the BYO folder accepts: NVIDIA signs its runtimes directly.
 static const wchar_t *kTrustedSignerCn = L"NVIDIA Corporation";
 
-// The product-name prefix the version resource carries ("NVIDIA DLSS-G",
-// "NVIDIA NGX", and friends - pinning a marketing name would break on a
+// The product-name prefix the version resource carries ("NVIDIA NGX", and
+// friends - pinning a marketing name would break on a
 // rename).
 static const wchar_t *kTrustedProductPrefix = L"NVIDIA";
 

@@ -76,8 +76,8 @@ def main():
         active = [i for i in btns if i.extra["filled"]]
         assert len(active) == 1 and active[0].key == "frame_multiplier:2"
         assert find(menu, "tile", "frame_generation").extra["value_text"] == "×2"
-        # Up to 6x (#163): DLSS 4.5's steps, the two above 4x carried by the
-        # header's third multiplier bit.
+        # Up to FG_MULTIPLIER_MAX (5x: FSR's dispatch has four outputs); the
+        # header's third multiplier bit is no longer written by the client.
         for value in range(2, protocol.FG_MULTIPLIER_MAX + 1):
             key = f"frame_multiplier:{value}"
             btn = next(i for i in btns if i.key == key)

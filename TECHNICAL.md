@@ -319,7 +319,7 @@ a maintainer's GPU, paths or experimental switches cannot leak into a release.
 | `pixels_in_shm` | result pixels come back through a shared section instead of the pipe (`false` — pipe, as before) |
 | `flow_preset` | which DIS configuration estimates the motion field: `fast` (default, as shipped), `ultrafast`, `medium`. See "What the guides cost" |
 | `frame_limit_mode`, `frame_limit_custom` | active-pipeline cap: 30, 60, custom 15–240, or unlimited |
-| `frame_generation`, `frame_multiplier` | opt-in FG and the requested multiplier, ×2 to ×6; a refused step is walked down, a refused ×2 turns it back off |
+| `frame_generation`, `frame_multiplier` | opt-in FG and the requested multiplier, ×2 to ×5; a refused step is walked down, a refused ×2 turns it back off |
 | `nr_preset` | the NR model preset, `default` / `a` / `b` (`default`): the feature's `Hint.Render.Preset` (0 / 1 / 2, `NS_NR_PRESET`), read once per worker, so a change restarts it. The runtime 310.9.16 has preset B (new, smaller, up to 2x faster by NVIDIA's figures; its default) and A (the previous model); the bundled 310.8.0 has one model and ignores the hint. The worker logs `[pure] NR runtime <version> (<bytes>), preset hint <n>` once per load |
 | (no key) Borderless | the Source block's button in window mode (#176): the processed window loses its caption, sizing border and edges and covers its monitor (`app/borderless.py`); what was taken is kept per window and put back on the second click and at exit. Not saved across sessions |
 | `nr_on` | whether NR was on when NeuralScreen was last left (#166, on): Num1 and the NR tile save it, the next start comes up with it; off, the first frame takes the ordinary NR OFF path |
@@ -937,7 +937,7 @@ centre stays sharp.
 
 **Where it runs.** After the network, after the HDR composite and after
 Frame Generation - never on the network's input, the motion field or the
-frames DLSS-G interpolates from (its motion is rectilinear). Every export site
+frames FSR interpolates from (its motion is rectilinear). Every export site
 - the SDR, bypass and HDR presents, each real and generated frame of the FG
 presenter, the Spout/GPU-recording copy and the pixel readback (screenshots,
 CPU recording) - hands its source to `LensApply`, which writes into a target

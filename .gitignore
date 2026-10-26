@@ -71,7 +71,7 @@ requirements.txt
 
 native/nvngx_dlss.dll
 
-native/nvngx_dlssg.dll
+# (the FSR runtime pair is listed at the end of this file)
 
 # BYO library folder: user-placed runtime dlls never enter git
 native/libraries/*.dll

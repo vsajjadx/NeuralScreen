@@ -17,15 +17,51 @@ jobs:
       - name: Build the launcher
         shell: cmd
         run: call native\build-launcher.bat
+      - name: Build the Spout adapter check
+        shell: cmd
+        run: call native\build-spout-adapter.bat
+      - name: Build the Spout compile check
+        shell: cmd
+        run: call native\build-spout-check.bat
+      - name: Build the Spout sender and receiver
+        shell: cmd
+        run: call native\build-spout-test.bat
+      - name: Build the GPU recorder check
+        shell: cmd
+        run: call native\build-gpu-recorder-check.bat
       - name: Fetch the AMD FSR runtime
         shell: cmd
         run: call native\fetch-fsr-runtime.bat
+      # A build script that "succeeds" without producing its file must not pass.
+      - name: Verify every native output exists
+        shell: pwsh
+        run: |
+          $need = @(
+            'native/nvngx.dll',
+            'native/nvngx.dll_ns-forwarder.dll',
+            'native/amd_fidelityfx_loader_dx12.dll',
+            'native/amd_fidelityfx_framegeneration_dx12.dll',
+            'native/spout_adapter_check.exe',
+            'native/spout_check.exe',
+            'native/spout_sender.exe',
+            'native/spout_receiver.exe',
+            'native/gpu_recorder_check.exe',
+            'NeuralScreen.exe')
+          $missing = $need | Where-Object { -not (Test-Path $_) }
+          if ($missing) { Write-Error ('missing native outputs: ' + ($missing -join ', ')); exit 1 }
+          $need | ForEach-Object { '{0,12:N0}  {1}' -f (Get-Item $_).Length, $_ }
       - uses: actions/upload-artifact@v4
         with:
           name: neuralscreen-native
+          if-no-files-found: error
           path: |
             native/nvngx.dll
             native/nvngx.dll_ns-forwarder.dll
             native/amd_fidelityfx_loader_dx12.dll
             native/amd_fidelityfx_framegeneration_dx12.dll
+            native/spout_adapter_check.exe
+            native/spout_check.exe
+            native/spout_sender.exe
+            native/spout_receiver.exe
+            native/gpu_recorder_check.exe
             NeuralScreen.exe

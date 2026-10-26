@@ -11,7 +11,7 @@ frame, whether the capture had anything new in it or not.
 * WGC's TryGetNextFrame returns at once, so a window that is not redrawing
   spun the whole loop - capture, FG - on the same picture every few ms.
 
-Each of those frames cost a full set of DLSS-G evaluates and queued a slot a
+Each of those frames cost a full set of FSR dispatches and queued a slot a
 few ms after the real one, which superseded the generated frames of the real
 step: the motion arrived as a burst and a hold.
 
@@ -25,7 +25,7 @@ frame_limit "unlimited", the default - beyond a cap far above the source):
    its generated frames are not superseded by slots that carried nothing
    new, nor real frames discarded unseen;
 3. DDA, the pointer moving over a still picture: the pointer-only frames are
-   held - no slot, no DLSS-G evaluate - so FG takes no more slots than with
+   held - no slot, no FSR dispatch - so FG takes no more slots than with
    the pointer at rest (the report: the rate went up when the mouse moved).
    Duplication reports a change anywhere on the output, so the rate at rest
    is measured first and is whatever the rest of the desktop makes it.
@@ -37,8 +37,8 @@ nothing and queues a slot per pointer update.
 Phases 1-2 show nothing (the worker's window is far off every monitor, the
 target is a ghost - tests/offscreen_target.py). Phase 3 shows a plain square
 in the top-left corner of the primary monitor for about four seconds and
-moves the pointer over it; the pointer is put back afterwards. Needs an RTX
-GPU with DLSS-G.
+moves the pointer over it; the pointer is put back afterwards. Needs a GPU
+with the FidelityFX runtime in native\\.
 
 Run:  runtime\\python.exe tests\\test_fg_fresh_frames.py
 """

@@ -1,6 +1,6 @@
 """Frame Generation's interface protection: finding a still HUD (v2.6.0).
 
-DLSS-G on the desktop has flat depth and estimated motion, so a label over a
+FSR frame generation on the desktop has flat depth and estimated motion, so a label over a
 moving scene is warped with the scene around it. The worker can show the real
 frame's pixels where it is told a still interface sits (UIRC); the client
 finds those places on the gray luminance (app/ui_protect.py).

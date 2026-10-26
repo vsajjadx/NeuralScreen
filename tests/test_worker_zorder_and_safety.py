@@ -135,12 +135,12 @@ def main() -> int:
                         "a new output at the old address uses a freed descriptor")
 
     # 7. DLL trust
-    gate = _code(_body(trust, "static bool NsTrustedDll(const wchar_t *path)"))
-    if "CreateFileW" not in gate or "NsTrustedDllHeld(path, hold)" not in gate:
+    gate = _code(_body(trust, "static bool NsTrustedDll(const wchar_t *path, const NsSignerPolicy *policy = &kNsPolicyNvidia)"))
+    if "CreateFileW" not in gate or "NsTrustedDllHeld(path, hold, policy)" not in gate:
         failures.append("NsTrustedDll does not take the hold before verifying")
     if re.search(r"return\s+true;\s*\}\s*$", gate) and "INVALID_HANDLE_VALUE) return false" not in gate:
         failures.append("the DLL gate may still pass without a hold")
-    held = _code(_body(trust, "static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold)"))
+    held = _code(_body(trust, "static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold, const NsSignerPolicy *policy)"))
     if "file.hFile = hold" not in held:
         failures.append("the signature is not verified through the held handle")
     nr = cpp.split('GetEnvironmentVariableW(L"NS_NR_DLL"', 1)[-1][:2000]
@@ -269,7 +269,7 @@ def main() -> int:
         failures.append("the machine-root chain is built at the current time "
                         "without the signature's certificates - a timestamped "
                         "DLL is refused once its certificate expires")
-    held = _code(_body(trust, "static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold)"))
+    held = _code(_body(trust, "static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold, const NsSignerPolicy *policy)"))
     if "sftVerifyAsOf" not in held:
         failures.append("the gate does not take the time WinVerifyTrust judged at")
 

@@ -1,4 +1,4 @@
-"""Opt-in RTX smoke test for DLSS-G output, bypass and clean shutdown.
+"""Opt-in smoke test for FSR frame generation output, bypass and clean shutdown.
 
 Run with --run. Shows a small moving test image for several seconds.
 The normal pixel export must still contain real frames, not generated ones.
@@ -211,7 +211,7 @@ def run(hdr=False, dynamic=False, check_pixels=False, fg_only=False):
         assert checked >= (6 if dynamic else 1), checked
         dumps.cleanup()
         print(f"PASS: {checked} generated HDR10 buffers preserve bright whites; no black frames")
-    print("PASS: paced DLSS-G output, bypass export, resume and clean shutdown", rates)
+    print("PASS: paced FSR output, bypass export, resume and clean shutdown", rates)
 
 
 if __name__ == "__main__":
@@ -220,4 +220,4 @@ if __name__ == "__main__":
         run("--hdr" in sys.argv, "--dynamic" in sys.argv,
             "--check-pixels" in sys.argv, "--fg-only" in sys.argv)
     else:
-        print("SKIP: opt-in DLSS-G/GPU test; pass --run")
+        print("SKIP: opt-in FSR/GPU test; pass --run")
