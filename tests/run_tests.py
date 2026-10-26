@@ -339,7 +339,7 @@ ABOUT = {
     "test_gpu_priority_env.py": "NS_GPU_PRIORITY sets the worker's GPU scheduling class and logs the read-back (#142)",
     "test_fg_mode_change.py": "a display mode change met by the FG presenter rebuilds the window once",
     "test_nr_dll_search.py": "the NR runtime is loaded from the worker's folder only, never from the cwd or PATH",
-    "test_fg_fault.py": "a fault inside the FidelityFX runtime is caught, FG goes off, and the worker keeps answering",
+    "test_fg_fault.py": "a fault inside the DLSS-G runtime is caught, FG goes off, and the worker keeps answering",
     "test_protocol_desync.py": "an unknown message is a named desync with a non-zero exit; EOF is still clean",
     "test_window_follow_static.py": "the picture keeps up with a window dragged without redrawing",
     "test_fg_hidden_target.py": "FG stands still while its window is hidden and stops at once",

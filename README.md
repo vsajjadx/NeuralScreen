@@ -10,7 +10,7 @@ same neural network that DLSS 5 games use, and comes back sharper.
 
 > **Notice.** Not affiliated with NVIDIA; NVIDIA, DLSS and the NVIDIA logo
 > are NVIDIA Corporation's trademarks. The bundled NVIDIA runtimes
-> (`nvngx_dlssnr.dll`) is NVIDIA's property, included
+> (`nvngx_dlssnr.dll`, `nvngx_dlssg.dll`) are NVIDIA's property, included
 > unmodified, research/educational use only, no warranty, use at your own
 > risk. Rights holders: say the word and the next build ships without them.
 
@@ -36,12 +36,12 @@ window list - and the **Before / after wipe** slider that splits the screen.*
 - **An NVIDIA RTX card.** **Validated** = reproduced locally; **reported** = user evidence;
   **unverified** = no successful run captured; **known failure** = the shipped runtime refuses or fails.
 
-  | Family | Neural Rendering | Frame Generation (AMD FSR) |
+  | Family | Neural Rendering | Frame Generation |
   |---|---|---|
-  | **RTX 50** | **validated** (5070 Ti) | **unverified** since the move from DLSS-G to FSR |
-  | **RTX 40** | **reported**, unresolved 4060 reports | **unverified** |
-  | **RTX 30** | **unverified** | **unverified** (FSR's analytical provider runs on any Shader Model 6.2 GPU) |
-  | **RTX 20** | **known failure** | **unverified** |
+  | **RTX 50** | **validated** (5070 Ti) | **validated** (5070 Ti) |
+  | **RTX 40** | **reported**, unresolved 4060 reports | **reported** (4080 Super ×2; 4060 needs retest) |
+  | **RTX 30** | **unverified** | **known failure** (below Ada) |
+  | **RTX 20** | **known failure** | **known failure** (below Ada) |
 
   Hybrid laptops and multi-GPU systems remain experimental; capture may use a slower fallback when the display is attached to the iGPU.
 
@@ -125,16 +125,15 @@ into a bar at the top that stays over a game. The dot is green while NR runs.
   picture stays sharp — the result is composed onto your original frame, so
   text and edges keep full resolution. Turn it off to compare. **NR passes**
   under the slider repeats the pass: an experiment, priced in TECHNICAL.md.
-- **FSR FG** — Frame Generation, off by default, with a ×2-×5 multiplier
-  beside the switch (and on **Num7**). AMD FSR Frame Generation (FidelityFX SDK
-  2.3, Frame Generation 4.0.1) in its desktop build: the depth is flat and the motion is estimated, there is no engine
+- **DLSS 4.5 FG** — Frame Generation, off by default, with a ×2-×6 multiplier
+  beside the switch (and on **Num7**; ×5/×6 on RTX 50). DLSS-G's own desktop
+  build: the depth is flat and the motion is estimated, there is no engine
   cooperation, so UI and text can distort — the known cost of the approach.
   The header pairs the two honest rates when they differ: "47 / 111 fps" is
-  the network's output, then what the presenter shows. FSR picks its newest provider
-  for the GPU (the ML one needs an AMD Radeon 9000-series card and Windows 11)
-  and falls back to the analytical provider that runs on any Shader Model 6.2
-  GPU; if none can run, **the switch flips back off with a short notice** — no
-  silent ON.
+  the network's output, then what the presenter shows. DLSS-G has a hardware
+  floor of its own: on a card below Ada the runtime refuses and **the switch
+  flips back off with a short notice** — no silent ON. Validated on RTX
+  50-series; adapters beyond it are unconfirmed.
 
 Behind the sliders icon: monitor/GPU, HDR, media folders, file conversion,
 Spout2, the recording indicator, an on-screen frame counter, tray options, key
@@ -144,8 +143,7 @@ assignments, keyboard navigation, **Notifications**, **Process priority**,
 ## Swapping a runtime
 
 Everything ships in the archive. To run your own runtime build (a newer
-FSR build, say), drop the AMD FidelityFX DLLs (`amd_fidelityfx_loader_dx12.dll` and
-`amd_fidelityfx_framegeneration_dx12.dll`, AMD-signed) into **`native/libraries/`** — it wins over the
+DLSS-G, say), drop the DLL into **`native/libraries/`** — it wins over the
 bundled copy; `nr_dll` / `NS_NR_DLL` remain the NR override.
 
 ## Recording and screenshots
@@ -193,8 +191,10 @@ settings — it is experimental; see [HDR setup](https://github.com/perseval-BLR
 - **Pipeline latency** is 25–30 ms (10-15ms with Boost Mode) — fine interactively, not competitively; **processing resolution is capped at 2560×1440**, output is always your full native resolution.
 - **Window/menu recovery:** the menu is re-shown, raised and redrawn after taskbar, monitor or GPU reactivation; a full driver reset remains hardware-dependent.
 - **Lossless Scaling:** there is no supported direct hand-off; one-window mode uses a separate presenter, so LS can still select the source HWND and show two windows.
+- **Frame generation on RTX 20/30:** there is no FSR FG backend; it is a research candidate, not a promised compatibility mode.
 
 ## License
 
-The code here is source-available under the PolyForm Strict License 1.0.0: noncommercial use is free; distributing, modifying or copying it needs the licensor's permission - see [LICENSE](LICENSE). NVIDIA's neural runtime
-ships unmodified and remains NVIDIA's property: `nvngx_dlssnr.dll` is the leaked 310.8.0 build (sm_75/86/89/120 kernels, RTX 20-50), as received, no guarantees, research-only. The frame generation runtime is AMD's signed FidelityFX SDK 2.3 DLLs, under AMD's license (`native/include/fsr/LICENSE.md`). Interface faces: IBM Plex (OFL-1.1, `fonts/OFL.txt`).
+The code here is source-available under the PolyForm Strict License 1.0.0: noncommercial use is free; distributing, modifying or copying it needs the licensor's permission - see [LICENSE](LICENSE). NVIDIA's runtimes
+ship unmodified and remain NVIDIA's property: `nvngx_dlssnr.dll` is the leaked 310.8.0 build (sm_75/86/89/120 kernels, RTX 20-50), `nvngx_dlssg.dll` is the
+public 310.9.16.0 redistributable — both as received, no guarantees, research-only. Interface faces: IBM Plex (OFL-1.1, `fonts/OFL.txt`).

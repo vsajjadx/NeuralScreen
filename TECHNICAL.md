@@ -319,7 +319,7 @@ a maintainer's GPU, paths or experimental switches cannot leak into a release.
 | `pixels_in_shm` | result pixels come back through a shared section instead of the pipe (`false` — pipe, as before) |
 | `flow_preset` | which DIS configuration estimates the motion field: `fast` (default, as shipped), `ultrafast`, `medium`. See "What the guides cost" |
 | `frame_limit_mode`, `frame_limit_custom` | active-pipeline cap: 30, 60, custom 15–240, or unlimited |
-| `frame_generation`, `frame_multiplier` | opt-in FG and the requested multiplier, ×2 to ×5; a refused step is walked down, a refused ×2 turns it back off |
+| `frame_generation`, `frame_multiplier` | opt-in FG and the requested multiplier, ×2 to ×6; a refused step is walked down, a refused ×2 turns it back off |
 | `nr_preset` | the NR model preset, `default` / `a` / `b` (`default`): the feature's `Hint.Render.Preset` (0 / 1 / 2, `NS_NR_PRESET`), read once per worker, so a change restarts it. The runtime 310.9.16 has preset B (new, smaller, up to 2x faster by NVIDIA's figures; its default) and A (the previous model); the bundled 310.8.0 has one model and ignores the hint. The worker logs `[pure] NR runtime <version> (<bytes>), preset hint <n>` once per load |
 | (no key) Borderless | the Source block's button in window mode (#176): the processed window loses its caption, sizing border and edges and covers its monitor (`app/borderless.py`); what was taken is kept per window and put back on the second click and at exit. Not saved across sessions |
 | `nr_on` | whether NR was on when NeuralScreen was last left (#166, on): Num1 and the NR tile save it, the next start comes up with it; off, the first frame takes the ordinary NR OFF path |
@@ -937,7 +937,7 @@ centre stays sharp.
 
 **Where it runs.** After the network, after the HDR composite and after
 Frame Generation - never on the network's input, the motion field or the
-frames FSR interpolates from (its motion is rectilinear). Every export site
+frames DLSS-G interpolates from (its motion is rectilinear). Every export site
 - the SDR, bypass and HDR presents, each real and generated frame of the FG
 presenter, the Spout/GPU-recording copy and the pixel readback (screenshots,
 CPU recording) - hands its source to `LensApply`, which writes into a target
@@ -1043,23 +1043,15 @@ The artifact `native/nvngx.dll` is not committed to the repo.
 
 ## Frame Generation on the desktop (opt-in)
 
-FSR Frame Generation (AMD FidelityFX SDK 2.3, Frame Generation 4.0.1) runs after
-the neural pass: the presenter asks the FSR context to interpolate between
-consecutive output frames. The context is used without FSR's swap chain proxy
-(`FFX_FRAMEGENERATION_FLAG_NO_SWAPCHAIN_CONTEXT_NOTIFY`): per frame the worker
-calls `ffxConfigure`, the prepare dispatch (flat depth, estimated motion in
-pixels, a still camera) and the generation dispatch, into textures the worker
-owns, and its own presenter shows them. There is no engine cooperation, so UI
-and text can distort where motion estimation guesses wrong. The multiplier is
-x2 to x5 (the dispatch carries four outputs); a provider that refuses a step is
-walked down to the one it takes, the switch is opt-in, and the header reports
-both rates - the network's and the presenter's - whenever they differ.
-
-The runtime picks the newest provider for the GPU (the ML one needs an AMD
-Radeon 9000-series card and Windows 11). A provider that cannot be created, or
-that refuses even x2, is set aside and the next one is tried (the legacy
-analytical provider needs only Shader Model 6.2); the log names it
-(`[fg] FSR provider: ...`).
+DLSS-G's desktop build runs after the neural pass: the presenter asks the FG
+feature to interpolate between consecutive output frames. The depth fed to it
+is flat and the motion is estimated per frame - there is no engine
+cooperation - so UI and text can distort where motion estimation guesses
+wrong; that is inherent to the screen-space approach, not a tuning issue.
+The multiplier is x2 to x6 (DLSS 4.5's ceiling; a runtime that refuses a
+step is walked down to the one it takes), the switch is
+opt-in, and the header reports both rates - the network's and the presenter's
+- whenever they differ.
 
 FG is independent of NR: with the neural pass off, the presenter interpolates
 the raw capture instead of the neural frame, so the doubled rate survives
@@ -1082,12 +1074,11 @@ submission: +0.3 ms a frame. With `NS_PHASE=1` the presenter logs its copy and
 vblank waits and how many generated frames were shown, late or superseded
 (`[phase] fg presenter`).
 
-The FG runtime (`amd_fidelityfx_loader_dx12.dll` and
-`amd_fidelityfx_framegeneration_dx12.dll`, FSR SDK 2.3.0) ships in the archive,
-AMD-signed and unmodified; `native\fetch-fsr-runtime.bat` downloads the pinned
-copies for a development tree. Absent the DLLs, the switch refuses politely and
-nothing breaks; a different build drops into `native/libraries/` (AMD signature
-required).
+The FG runtime (`nvngx_dlssg.dll`) ships in the archive - the public
+310.9.16.0 redistributable, NVIDIA-signed, included unmodified. The licensing
+position is stated in the README notice: research use, takedown on request.
+Absent the DLL, the switch refuses politely and nothing breaks; a different
+build drops into `native/libraries/`.
 
 ## Runtimes and the libraries folder
 

@@ -37,7 +37,7 @@ static bool EnsurePresentFormat(bool hdr, bool pq)
         FlushPresentQueue("present-format");
         if (FAILED(g_present_swap->ResizeBuffers(0, 0, 0, format, desc.Flags)))
         { Log("[hdr] swap chain format change failed"); return false; }
-        Log("[hdr] presentation=%s", pq ? "HDR10 PQ (FSR FG)" : hdr ? "FP16 scRGB" : "8-bit SDR");
+        Log("[hdr] presentation=%s", pq ? "HDR10 PQ (DLSS-G)" : hdr ? "FP16 scRGB" : "8-bit SDR");
         g_present_space_set = false;
     }
     // Once per swap chain, not once per frame. The space only changes with
@@ -222,7 +222,7 @@ static bool PresentHdr(VideoState &v, bool bypass, bool allow_fg, UINT64 *submit
         table.ptr += 4 * static_cast<UINT64>(stride);
         h.list->SetComputeRootDescriptorTable(0, table);
         auto pq = constants;
-        pq.hdr |= 2u;   // the shader's PQ encode, as for Frame Generation
+        pq.hdr |= 2u;   // the shader's PQ encode, as for DLSS-G
         h.list->SetComputeRoot32BitConstants(1, 5, &pq, 0);
         h.list->Dispatch((w+7)/8, (height+7)/8, 1);
         auto to_copy = Transition(g_rec_pq, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
@@ -254,7 +254,7 @@ static bool PresentHdr(VideoState &v, bool bypass, bool allow_fg, UINT64 *submit
     h.list->ResourceBarrier(1, post);
     h.list->ResourceBarrier(bypass ? 1 : 2, post + 1);
     // What the screen gets: the composite, or its fisheye lens. With Frame
-    // Generation the composite goes to FSR unbent and FgPresent puts the
+    // Generation the composite goes to DLSS-G unbent and FgPresent puts the
     // lens on what it shows.
     ID3D12Resource *shown = framegen ? g_hdr_output
         : LensApply(h.list, g_hdr_output, D3D12_RESOURCE_STATE_COMMON, LENS_SHOWN);

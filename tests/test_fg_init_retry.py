@@ -11,7 +11,7 @@ switching it on again must make a clean second attempt.
 Checked on the worker: Init_Ext is made to fail once
 (NS_TEST_FAIL_STAGE=fg-init), FG is switched off and on again, and the
 second attempt must initialise the runtime afresh, and the worker must keep
-answering every frame. Nothing shows. Needs a GPU with the FidelityFX runtime.
+answering every frame. Nothing shows. Needs an RTX GPU with DLSS-G.
 
 Run:  runtime\python.exe tests\test_fg_init_retry.py
 """
@@ -91,10 +91,10 @@ def main() -> int:
     if not any("injecting failure at stage=fg-init" in ln for ln in lines):
         unavailable = any(("[fg]" in ln and "load failed" in ln) for ln in lines)
         if unavailable and not failures:
-            print("SKIP: Frame Generation did not run here (FidelityFX runtime unavailable)")
+            print("SKIP: Frame Generation did not run here (DLSS-G unavailable)")
             return 0
         failures.append("the FG runtime was never initialised")
-    inits = [ln for ln in lines if "[fg] Init ->" in ln]
+    inits = [ln for ln in lines if "[fg] Init_Ext ->" in ln]
     if len(inits) < 2:
         failures.append(f"Init_Ext ran {len(inits)} time(s): the second switch-on "
                         f"reused a runtime whose initialisation had failed")

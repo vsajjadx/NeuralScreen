@@ -37,7 +37,7 @@ TERMS = {
     "motion_nvofa",     # the backend's own name
     "boost",            # the feature's name
     "about_windows",    # "Windows"
-    "frame_generation",  # "FSR Frame Generation"
+    "frame_generation",  # "DLSS Frame Generation"
 }
 #: Language names are endonyms: each is written in its own language.
 LANG_KEYS = {key for key in STRINGS["en"] if key.startswith("lang_")}

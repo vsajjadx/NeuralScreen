@@ -43,28 +43,13 @@
 #pragma comment(lib, "crypt32.lib")
 #pragma comment(lib, "version.lib")
 
-// The default signer the BYO folder accepts: NVIDIA signs its runtimes directly.
+// The one signer the BYO folder accepts: NVIDIA signs its runtimes directly.
 static const wchar_t *kTrustedSignerCn = L"NVIDIA Corporation";
 
-// The product-name prefix the version resource carries ("NVIDIA NGX", and
-// friends - pinning a marketing name would break on a
+// The product-name prefix the version resource carries ("NVIDIA DLSS-G",
+// "NVIDIA NGX", and friends - pinning a marketing name would break on a
 // rename).
 static const wchar_t *kTrustedProductPrefix = L"NVIDIA";
-
-// A runtime publisher the gate can be asked to accept: the signer's name (an
-// exact match, or a prefix where the publisher's certificate carries a
-// longer legal name) and the prefix of the version resource's product name.
-// NVIDIA's runtimes are the default; AMD's FidelityFX DLLs (the FSR frame
-// generation runtime) are signed by "Advanced Micro Devices" and carry
-// "AMD FidelityFX ..." as their product name.
-struct NsSignerPolicy
-{
-    const wchar_t *signer;
-    bool           signer_is_prefix;
-    const wchar_t *product_prefix;
-};
-static const NsSignerPolicy kNsPolicyNvidia = { kTrustedSignerCn, false, kTrustedProductPrefix };
-static const NsSignerPolicy kNsPolicyAmd    = { L"Advanced Micro Devices", true, L"AMD" };
 
 // Handles kept open until the process exits, so the verified bytes are the
 // bytes LoadLibrary maps.
@@ -165,9 +150,9 @@ static PCCERT_CONTEXT NsLeafCertificate(const wchar_t *path,
 
 // Verify a DLL's Authenticode signature end to end: valid chain to a
 // machine root, NVIDIA signer, NVIDIA product name. True = loadable.
-static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold, const NsSignerPolicy *policy);
+static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold);
 
-static bool NsTrustedDll(const wchar_t *path, const NsSignerPolicy *policy = &kNsPolicyNvidia)
+static bool NsTrustedDll(const wchar_t *path)
 {
     // ---- the anti-swap hold, first -------------------------------------
     if (g_trusted_file_count >= (int)(sizeof(g_trusted_file_handles)
@@ -177,7 +162,7 @@ static bool NsTrustedDll(const wchar_t *path, const NsSignerPolicy *policy = &kN
                               nullptr, OPEN_EXISTING,
                               FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hold == INVALID_HANDLE_VALUE) return false;
-    if (!NsTrustedDllHeld(path, hold, policy)) { CloseHandle(hold); return false; }
+    if (!NsTrustedDllHeld(path, hold)) { CloseHandle(hold); return false; }
     g_trusted_file_handles[g_trusted_file_count++] = hold;
     return true;
 }
@@ -185,7 +170,7 @@ static bool NsTrustedDll(const wchar_t *path, const NsSignerPolicy *policy = &kN
 // The checks, with the file already held open. The signature is verified
 // through that very handle; the other reads go by path, which the hold keeps
 // pointing at the same bytes.
-static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold, const NsSignerPolicy *policy)
+static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold)
 {
     // ---- Authenticode -------------------------------------------------
     WINTRUST_FILE_INFO file = {};
@@ -247,9 +232,7 @@ static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold, const NsSignerPol
             {
                 if (CertGetNameStringW(leaf, CERT_NAME_SIMPLE_DISPLAY_TYPE,
                                        0, nullptr, name, len) > 0
-                    && (policy->signer_is_prefix
-                            ? wcsncmp(name, policy->signer, wcslen(policy->signer)) == 0
-                            : wcscmp(name, policy->signer) == 0))
+                    && wcscmp(name, kTrustedSignerCn) == 0)
                     signer_ok = true;
                 HeapFree(GetProcessHeap(), 0, name);
             }
@@ -287,8 +270,8 @@ static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold, const NsSignerPol
             UINT plen = 0;
             if (VerQueryValueW(block, query, (void **)&product, &plen)
                 && product && plen > 0
-                && wcsncmp(product, policy->product_prefix,
-                           wcslen(policy->product_prefix)) == 0)
+                && wcsncmp(product, kTrustedProductPrefix,
+                           wcslen(kTrustedProductPrefix)) == 0)
                 product_ok = true;
         }
     }
@@ -303,13 +286,4 @@ static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold, const NsSignerPol
 static bool NsGateByoDll(const wchar_t *path, const char *what)
 {
     return NsTrustedDll(path);
-}
-
-// The same gate for a user-supplied AMD FidelityFX runtime (the FSR frame
-// generation loader and provider): AMD's Authenticode signature, a chain to a
-// machine root, product name "AMD ...".
-static bool NsGateByoDllAmd(const wchar_t *path, const char *what)
-{
-    (void)what;
-    return NsTrustedDll(path, &kNsPolicyAmd);
 }

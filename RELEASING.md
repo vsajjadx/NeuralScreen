@@ -450,7 +450,7 @@ failure. The messages worth recognising:
 | Builder run before tagging | `required tag vX.Y.Z does not exist` |
 | Anything committed after the tag | `tag vX.Y.Z resolves to <a>, HEAD is <b>` |
 | A mandatory file not committed | `mandatory release input is untracked at vX.Y.Z: <path>` / `release input is not tracked by the tag: <path>` |
-| A native binary or the runtime missing | `required runtime artifact is missing: native/amd_fidelityfx_framegeneration_dx12.dll` |
+| A native binary or the runtime missing | `required runtime artifact is missing: native/nvngx_dlssg.dll` |
 | Wrong DLL build | `runtime architecture mismatch: missing sm_86` (the DLL must carry sm_75/86/89/120 fatbins) |
 | Notes too long | `release notes: concise: the release body is 5180 characters - too long` (only after publishing) |
 | Notes missing a mandatory block | `release vX is missing driver warning alert` |

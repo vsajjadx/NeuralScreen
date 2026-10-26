@@ -4,17 +4,12 @@ NeuralScreen is distributed with third-party components. This file is a
 notice and attribution index; the corresponding license texts shipped with
 the components remain controlling.
 
-## NVIDIA and AMD components
+## NVIDIA components
 
-The package currently contains AMD's FidelityFX runtime and one NVIDIA runtime.
-AMD, FidelityFX and FSR are trademarks of Advanced Micro Devices, Inc.; this
-project is not affiliated with or endorsed by AMD.
+The package currently contains two different classes of NVIDIA software:
 
-- `amd_fidelityfx_loader_dx12.dll` and `amd_fidelityfx_framegeneration_dx12.dll`
-  (AMD FSR SDK 2.3.0, Frame Generation 4.0.1) are AMD-signed, unmodified, and
-  redistributed in binary form under AMD's license, reproduced in
-  `native/include/fsr/LICENSE.md`; the FidelityFX API headers under
-  `native/include/fsr/` carry AMD's MIT notice.
+- `nvngx_dlssg.dll` 310.9.16.0 is an NVIDIA-signed public DLSS-G
+  redistributable and remains subject to NVIDIA's applicable terms.
 - `nvngx_dlssnr.dll` 310.8.0 is a leaked, non-public DLSS-NR build. The project
   has not documented a grant that permits redistributing this file. Its
   presence in an archive, an attribution notice, or a research-only label does

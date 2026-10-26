@@ -69,6 +69,5 @@ The **licensor** is the individual or entity offering these terms, and the **sof
 
 ---
 
-Note: the bundled `native/nvngx_dlssnr.dll` is NVIDIA's property, and the bundled
-`native/amd_fidelityfx_*.dll` are AMD's; neither is covered by this license. See
-README.md, section License.
+Note: the bundled `native/nvngx_dlssnr.dll` / `native/nvngx_dlssg.dll` are
+NVIDIA's property, not covered by this license. See README.md, section License.

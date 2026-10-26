@@ -6,7 +6,7 @@
 // pinned against its Python format by tests/test_protocol_sizes.py. The worker
 // captures the desktop or one window (Desktop Duplication, Windows.Graphics.
 // Capture), runs the network, presents the result in its own overlay window,
-// and on request generates frames (AMD FSR), estimates motion (NVOFA),
+// and on request generates frames (DLSS-G), estimates motion (NVOFA),
 // publishes over Spout2 and records on the GPU (gpu_recorder.cpp). It carries
 // the name nvngx.dll because the NR runtime serves only callers whose module
 // path does.

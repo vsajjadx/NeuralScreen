@@ -1,6 +1,6 @@
 """Frame Generation's interface protection: where a still interface sits (v2.6.0).
 
-FSR frame generation here has no engine to tell it what is HUD: the depth is flat and the
+DLSS-G here has no engine to tell it what is HUD: the depth is flat and the
 motion estimated, so a label over a moving scene is warped with the scene
 around it - text and HUD smear in the generated frames, the known cost of the
 desktop approach. The worker can show the real frame's pixels instead in

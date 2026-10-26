@@ -14,7 +14,7 @@ presenter's own phase line reports that wait.
 
 Fails on the code before the fix (vblank wait 0.00 ms); passes after it
 (about one vblank). Nothing shows: the overlay is far off every monitor and
-the target is a ghost. Needs a GPU with the FidelityFX runtime.
+the target is a ghost. Needs an RTX GPU with DLSS-G.
 
 Run:  runtime\\python.exe tests\\test_fg_waitable_drain.py
 """

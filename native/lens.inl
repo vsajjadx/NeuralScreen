@@ -29,7 +29,7 @@
 // fisheye off the pass does not run at all.
 //
 // Where it runs: after the network, after the HDR composite and after Frame
-// Generation - never on the network's input, the motion field or what FSR
+// Generation - never on the network's input, the motion field or what DLSS-G
 // interpolates (its motion is rectilinear). Each export site hands its source
 // to LensApply, which writes the lens into a texture of its own and returns
 // that in the source's state - or the source itself while the lens is off, so

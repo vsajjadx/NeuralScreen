@@ -14,7 +14,7 @@ through WGC:
 * the pixels handed back for a screenshot do not carry it: the corner the
   badge sits in is the captured picture, not the badge's solid colour.
 
-Needs a GPU (the FidelityFX runtime for the FG half).
+Needs an RTX GPU (DLSS-G for the FG half).
 
 Run:  runtime\python.exe tests\test_badge_worker.py
 """
