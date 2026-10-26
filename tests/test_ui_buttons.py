@@ -180,7 +180,7 @@ def main() -> int:
     # The key rows have their own tab now.
     menu.settings_tab = "keys"
     menu.layout(3840, 2160)
-    for hk_cmd in ("toggle", "settings", "screenshot_menu", "record",
+    for hk_cmd in ("toggle", "framegen", "boost", "settings",
                    "window_mode", "scale_up", "scale_down", "quit"):
         hk = find(menu, "hotkey", hk_cmd)
         if hk is None:
@@ -193,8 +193,8 @@ def main() -> int:
     # of the three restart the worker when they fire (spout, hdr).
     # The toggles are spread over the tabs now: capture holds hdr and the
     # static skip, recording holds spout and the indicator.
-    for tg_key, tg_tab in (("spout", "rec"), ("rec_indicator", "rec"),
-                           ("hdr", "capture")):
+    for tg_key, tg_tab in (("hdr", "capture"), ("window_follow", "capture"),
+                           ("open_on_start", "app")):
         menu.settings_tab = tg_tab
         menu.layout(3840, 2160)
         tg = find(menu, "toggle", tg_key)
@@ -215,12 +215,12 @@ def main() -> int:
     # 16.09: only explicit switches and choices react). A click on the empty
     # left half of a toggle row must emit nothing - it used to flip the
     # switch.
-    menu.settings_tab = "rec"
+    menu.settings_tab = "capture"
     menu.layout(3840, 2160)
     paint(menu)
-    label_tg = find(menu, "toggle", "spout")
+    label_tg = find(menu, "toggle", "hdr")
     if label_tg is None:
-        failures.append("no spout toggle for the label hit-test")
+        failures.append("no hdr toggle for the label hit-test")
     else:
         label_pos = (label_tg.rect.x + menu._u(8),
                      label_tg.rect.y + menu._u(overlay_ui.CTRL_H) // 2)
@@ -231,17 +231,17 @@ def main() -> int:
     # The hint under a toggle is a caption, not a hit target: a click on
     # the explanation must emit nothing (the Spout2 toggle restarts the
     # worker, so a stray click there would freeze the screen for seconds).
-    menu.settings_tab = "rec"
+    menu.settings_tab = "capture"
     menu.layout(3840, 2160)
     paint(menu)
-    spout_tg = find(menu, "toggle", "spout")
-    if spout_tg is None:
-        failures.append("no spout toggle for the hint hit-test")
-    elif not spout_tg.extra.get("hint"):
-        failures.append("the spout toggle lost its hint")
+    hdr_tg = find(menu, "toggle", "hdr")
+    if hdr_tg is None:
+        failures.append("no hdr toggle for the hint hit-test")
+    elif not hdr_tg.extra.get("hint"):
+        failures.append("the hdr toggle lost its hint")
     else:
-        hint_pos = (spout_tg.rect.centerx,
-                    spout_tg.rect.y + menu._u(overlay_ui.CTRL_H)
+        hint_pos = (hdr_tg.rect.centerx,
+                    hdr_tg.rect.y + menu._u(overlay_ui.CTRL_H)
                     + menu._u(10))
         out = menu.handle_event(pygame.event.Event(
             pygame.MOUSEBUTTONDOWN, {"pos": hint_pos, "button": 1}))
@@ -284,15 +284,9 @@ def main() -> int:
             out = click(menu, opts[1])
             if out != [("profile", "Strong / Cinematic")]:
                 failures.append(f"profile pick: expected Strong, got {out}")
-    for key, want in (("screenshot", [("button", "screenshot")]),
-                      ("record", [("button", "record")])):
-        btn = find(menu, "button", key)
-        if btn is None:
-            failures.append(f"no {key} button in the Actions section")
-            continue
-        out = click(menu, btn)
-        if out != want:
-            failures.append(f"button {key}: expected {want}, got {out}")
+    for gone in ("screenshot", "record", "convert", "lens"):
+        if find(menu, "button", gone) is not None or find(menu, "tile", gone) is not None:
+            failures.append(f"the {gone} control is back on the main page")
 
     # 3a2. Style is its own control now - the measurement says it is the
     #      strongest lever there is, and it used to be reachable only by
@@ -478,8 +472,7 @@ def main() -> int:
     menu.set_state({"nr_small": True, "work_size": "2496x1404"})
     menu.layout(3840, 2160)
     paint(menu)
-    for key, want_prefix in (("intensity", "param"), ("split", "split"),
-                             ("nr_res", "nr_res")):
+    for key, want_prefix in (("intensity", "param"), ("nr_res", "nr_res")):
         sl = find(menu, "slider", key)
         if sl is None:
             failures.append(f"no {key} slider on the main page")
@@ -527,89 +520,14 @@ def main() -> int:
                 failures.append(f"delete_preset: expected "
                                 f"[('button', 'delete_preset')], got {out}")
 
-    # 8. The conversion page. The main page's Convert cell opens it; each
-    #    row's button carries its job and its action in the key; the footer
-    #    adds files; the output choices send their values; and a file dropped
-    #    on the panel opens the page and joins the queue.
-    menu.page = "main"
-    menu.layout(3840, 2160)
-    paint(menu)
-    cell = find(menu, "button", "convert")
-    if cell is None:
-        failures.append("no Convert cell in the main page's actions")
-    else:
-        out = click(menu, cell)
-        if menu.page != "convert" or out != [("capture", None)]:
-            failures.append(f"Convert: expected the conversion page, got "
-                            f"page={menu.page!r} out={out}")
-    menu.page = "convert"
-    menu.set_state({"convert_dest": "source", "convert_jobs": [
-        {"id": 7, "name": "clip.mp4", "kind": "video", "status": "running",
-         "fraction": 0.4, "line": "40%", "tone": "text", "action": "stop"},
-        {"id": 8, "name": "still.png", "kind": "image", "status": "done",
-         "fraction": 1.0, "line": "done", "tone": "ok", "action": "show"}]})
-    menu.layout(3840, 2160)
-    paint(menu)
-    for key in ("convert_job:7:stop", "convert_job:8:show",
-                "convert_clear", "convert_stop_all"):
-        btn = find(menu, "button", key)
-        if btn is None:
-            failures.append(f"conversion page: no {key!r} button")
-            continue
-        out = click(menu, btn)
-        if out != [("button", key)]:
-            failures.append(f"{key}: expected [('button', {key!r})], got {out}")
-    add = find(menu, "action", "convert_add")
-    if add is None:
-        failures.append("no Add files in the conversion page's footer")
-    else:
-        out = click(menu, add)
-        if out != [("button", "convert_add")]:
-            failures.append(f"Add files: expected [('button', 'convert_add')], "
-                            f"got {out}")
-    for key, value in (("convert_dest", "folder"), ("convert_codec", "h264"),
-                       ("convert_quality", "small"),
-                       ("convert_image_format", "png")):
-        menu.layout(3840, 2160)
-        paint(menu)
-        seg = find(menu, "segmented", key)
-        cells = (seg.extra.get("cells") or []) if seg else []
-        if not cells:
-            failures.append(f"conversion page: no {key!r} segment")
-            continue
-        at = cells[list(seg.payload).index(value)].center
-        out = menu.handle_event(pygame.event.Event(
-            pygame.MOUSEBUTTONDOWN, {"pos": at, "button": 1}))
-        menu.handle_event(pygame.event.Event(
-            pygame.MOUSEBUTTONUP, {"pos": at, "button": 1}))
-        if out != [(key, value)]:
-            failures.append(f"{key}: expected [({key!r}, {value!r})], got {out}")
-    menu.layout(3840, 2160)
-    paint(menu)
-    if find(menu, "button", "convert_dir") is None:
-        failures.append("One folder shows no Change folder button")
-    audio = find(menu, "toggle", "convert_audio")
-    if audio is None:
-        failures.append("no Keep audio switch on the conversion page")
-    else:
-        out = click(menu, audio)
-        if out != [("toggle", "convert_audio")]:
-            failures.append(f"Keep audio: expected [('toggle', "
-                            f"'convert_audio')], got {out}")
+    # 8. The conversion page is gone: a dropped file does nothing, and the
+    #    main page has no Convert cell.
     menu.page = "main"
     menu.layout(3840, 2160)
     out = menu.handle_event(pygame.event.Event(
         pygame.DROPFILE, {"file": "C:/clips/drop.mp4"}))
-    if menu.page != "convert" or out != [("capture", None),
-                                         ("convert_files", ["C:/clips/drop.mp4"])]:
-        failures.append(f"a dropped file: expected the conversion page and "
-                        f"the file queued, got page={menu.page!r} out={out}")
-    menu.layout(3840, 2160)
-    paint(menu)
-    back = find(menu, "action", "back")
-    if back is None or click(menu, back) != [("capture", None)] \
-            or menu.page != "main":
-        failures.append("Back on the conversion page did not return to main")
+    if menu.page != "main" or out != []:
+        failures.append(f"a dropped file must be ignored, got page={menu.page!r} out={out}")
 
     if failures:
         for f in failures:

@@ -731,8 +731,8 @@ def _update_ui_protection(st) -> None:
     worker = getattr(st, "worker", None)
     if worker is None or worker.poll() is not None:
         return
-    want = (bool(st.cfg.get("fg_ui_protect", False))
-            and bool(st.cfg.get("frame_generation", False))
+    # Interface protection is always on with FG (the switch was removed).
+    want = (bool(st.cfg.get("frame_generation", False))
             and bool(getattr(st, "gray_active", False)))
     rects = []
     if want:
@@ -1982,8 +1982,6 @@ def drain_commands(st) -> bool:
                     settings_io.save_menu_layout(st)
                 except Exception as exc:
                     print(f"[main] the NR state was not saved ({exc})", file=sys.stderr)
-            elif cmd == "screenshot_menu":
-                request_screenshot(st)
             elif cmd == "framegen":
                 # A plain on/off for Frame Generation (user request 15.09).
                 # The same path the menu switch takes, so the config write,
@@ -1996,14 +1994,14 @@ def drain_commands(st) -> bool:
                 st.display.alert(UI_STRINGS[st.lang].get(
                     "fg_on" if state else "fg_off",
                     "FSR FG ON" if state else "FSR FG OFF"))
-            elif cmd == "lens":
-                # The camera on/off from the keyboard (#164): the menu
-                # switch's own path - the config, the menu state and the one
-                # LENS command to the worker.
-                apply_menu_action(st, ("toggle", "lens"))
-                st.display.alert(UI_STRINGS[st.lang].get(
-                    "lens_on" if st.cfg.get("lens") else "lens_off",
-                    "Camera ON" if st.cfg.get("lens") else "Camera OFF"))
+            elif cmd == "boost":
+                # Boost on/off from the keyboard: the panel tile's own path.
+                apply_menu_action(st, ("toggle", "boost"))
+                boost_on = bool(settings_io.queued_small(st))
+                st.display.alert(UI_STRINGS[st.lang]["boost"] + " "
+                                 + UI_STRINGS[st.lang].get(
+                                     "tile_on" if boost_on else "tile_off",
+                                     "On" if boost_on else "Off"))
             elif cmd in ("nr_passes_up", "nr_passes_down"):
                 # The NR cascade one pass up or down (#126), through the same
                 # action the panel's control takes.

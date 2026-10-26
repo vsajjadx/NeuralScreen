@@ -82,7 +82,7 @@ def main() -> int:
         disp = display_mod.Display(1280, 720)
         menu = disp.menu
         menu.set_state({"nr": True, "gpu_ok": True, "frame_generation": True,
-                        "frame_multiplier": 3, "nr_small": True, "lens": False,
+                        "frame_multiplier": 3, "nr_small": True,
                         "profile": "Natural", "profiles": ["Natural"]})
         disp.set_hud({"fps_overlay": "off", "nr": True, "gpu_ok": True})
         menu.visible = True
@@ -92,7 +92,6 @@ def main() -> int:
         # 1. What the bar holds, and what its clicks do.
         order = [(i.kind, i.key) for i in sorted(menu.items, key=lambda i: i.rect.x)]
         want = [("tile", "nr"), ("tile", "frame_generation"), ("tile", "boost"),
-                ("tile", "lens"), ("button", "screenshot"), ("button", "record"),
                 ("icon", "mini"), ("icon", "min")]
         print(f"    bar: {[k for _, k in order]}, {menu.panel_rect.size}")
         if order != want:

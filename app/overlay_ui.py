@@ -105,19 +105,14 @@ _CONVERT_SEGMENTS = {
 }
 
 NEUTRAL_CHOICE = {
-    "frame_limit_mode": "unlimited",
     "motion_backend": "nvofa",
-    "screenshot_mode": "ask",
-    "screenshot_format": "png",
 }
 
 HOTKEY_ROWS = (
     ("toggle", "hk_nr"),
     ("framegen", "hk_framegen"),
-    ("lens", "hk_lens"),
+    ("boost", "boost"),
     ("settings", "hk_menu"),
-    ("screenshot_menu", "hk_shot"),
-    ("record", "hk_record"),
     ("window_mode", "hk_window"),
     ("scale_up", "hk_scale_up"),
     ("scale_down", "hk_scale_down"),
@@ -169,7 +164,11 @@ def palette(theme: str) -> dict:
 
 
 # --- Base layout (1440p units) --------------------------------------------
-PANEL_W = 540
+#: The compact main window. The settings page keeps its old width: its
+#: one-line hints and three-cell captions are measured in twelve languages
+#: (tests/test_settings_hints.py) and do not fit a narrower strip.
+PANEL_W = 500
+SETTINGS_PANEL_W = 540
 PAD = 26
 TITLE_H = 54
 LABEL_H = 24
@@ -218,7 +217,7 @@ SMALL_SIZE = 14
 #: at this panel width - measured across twelve languages, Polish takes 96%
 #: of the strip - so a fifth subject needs a wider panel or a scrolling
 #: strip, not another tab squeezed in.
-SETTINGS_TABS = ("capture", "rec", "keys", "app")
+SETTINGS_TABS = ("capture", "keys", "app")
 
 PARAM_KEYS = ("intensity", "local_tone", "local_structure", "skin_structure")
 # The fallback range, used only if the state has no "param_ranges" - the
@@ -463,7 +462,7 @@ class OverlayMenu:
             # from this dict is dropped by set_state in silence, and the toggle
             # would draw as off while the opt-out was still in force.
             "keep_speed_when_hidden": True,
-            "fg_ui_protect": False,
+            "fg_ui_protect": True,
             "dim_on_rebuild": True,
             "window_follow": False,
             "nr_preset": "default",
@@ -1144,7 +1143,7 @@ class OverlayMenu:
                 self.settings_tab = saved_tab
             self._settings_content_h = tallest
         s = STRINGS.get(self.lang, STRINGS["en"])
-        w = self._u(PANEL_W)
+        w = self._u(SETTINGS_PANEL_W if self.page == "settings" else PANEL_W)
         # Never wider than the screen: a 1080-wide portrait monitor at the
         # top manual scale asked for 1152 px, and the clamp below can only
         # move a panel, not shrink it - the right edge, with the header
@@ -1540,125 +1539,6 @@ class OverlayMenu:
                     cy += row_h + self._u(4)
             cy += gap
 
-        elif self.page == "convert":
-            # The conversion page. Laid out like the windows page - rows, and
-            # Back beside the page's own action in the footer - because it is
-            # the same kind of page: a list the user acts on, not settings set
-            # once in a lifetime. Top to bottom: what the page does, the queue,
-            # and what the files come out as.
-            jobs = [dict(j) for j in (self.state.get("convert_jobs") or [])
-                    if isinstance(j, dict)]
-            hint = s.get("convert_page_hint", "")
-            if hint:
-                note_h = self._note_height(hint, inner_w)
-                items.append(Item("note", "convert_hint",
-                                  pygame.Rect(pad, cy, inner_w, note_h),
-                                  extra={"text": hint}))
-                cy += note_h + gap
-            section(s.get("sec_convert_queue", "files"))
-            if not jobs:
-                # The empty state is also the drop target's outline: files
-                # dropped anywhere on the screen land here, and the dashed box
-                # is what says so before anyone tries.
-                empty = s.get("convert_empty", "")
-                inset = self._u(14)
-                box_h = self._note_height(empty, inner_w - 2 * inset) + 2 * inset
-                items.append(Item("note", "convert_empty",
-                                  pygame.Rect(pad, cy, inner_w, box_h),
-                                  extra={"text": empty, "boxed": True,
-                                         "inset": inset}))
-                cy += box_h + gap
-            else:
-                act_w = self._convert_action_width(s)
-                row_pad = self._u(8)
-                row_h = (row_pad + label_h
-                         + self._small_font.get_height() + self._u(4)
-                         + self._u(4) + row_pad)
-                btn_h = ctrl_h - self._u(4)
-                for job in jobs:
-                    rect = pygame.Rect(pad, cy, inner_w, row_h)
-                    action = str(job.get("action")
-                                 or _CONVERT_ROW_ACTION.get(job.get("status"),
-                                                            "retry"))
-                    items.append(Item("job", f"convert_row:{job.get('id')}",
-                                      rect, payload=job.get("id"),
-                                      extra={"job": job, "act_w": act_w,
-                                             "row_pad": row_pad}))
-                    # The row's one button, keyed by the job and the action:
-                    # the key IS the command (commands.convert_row_action),
-                    # and a key per row keeps hover and focus on this row.
-                    items.append(Item(
-                        "button", f"convert_job:{job.get('id')}:{action}",
-                        pygame.Rect(rect.right - row_pad - act_w,
-                                    rect.y + row_pad + (label_h - btn_h) // 2,
-                                    act_w, btn_h),
-                        extra={"label": s.get(f"convert_act_{action}", action),
-                               "small": True}))
-                    cy += row_h + self._u(6)
-                cy += self._u(4)
-                finished = any(j.get("status") in ("done", "failed", "cancelled")
-                               for j in jobs)
-                active = any(j.get("status") in ("queued", "running")
-                             for j in jobs)
-                bw = inner_w // 2
-                for idx, (key, label, enabled) in enumerate((
-                        ("convert_clear", s.get("convert_clear", "Clear finished"),
-                         finished),
-                        ("convert_stop_all", s.get("convert_stop_all", "Stop all"),
-                         active))):
-                    cw = bw if idx == 0 else inner_w - bw
-                    items.append(Item("button", key,
-                                      pygame.Rect(pad + idx * bw, cy, cw, act_h),
-                                      extra={"label": label, "filled": False,
-                                             "pair": "left" if idx == 0 else "right",
-                                             "disabled": not enabled}))
-                cy += act_h + self._u(8)
-
-            section(s.get("sec_convert_output", "output"))
-            dest = str(self.state.get("convert_dest", "source"))
-            segmented("convert_dest", s.get("convert_dest", "Save to"), dest,
-                      ["source", "folder"],
-                      labels=[s.get("convert_dest_source", "Beside original"),
-                              s.get("convert_dest_folder", "One folder")])
-            if dest == "folder":
-                # The folder and the action beside it - the screenshot
-                # folder's row, for the same reasons (the path elided in the
-                # middle, the button saying only what it does).
-                folder = str(self.state.get("convert_dir") or "")
-                bgap = self._u(BTN_GAP)
-                btn_w = max(self._u(120), inner_w // 3)
-                items.append(Item("info", "convert_dir_path",
-                                  pygame.Rect(pad, cy, inner_w - btn_w - bgap,
-                                              ctrl_h),
-                                  extra={"label": "",
-                                         "value": self._elide_path(folder)}))
-                items.append(Item("button", "convert_dir",
-                                  pygame.Rect(pad + inner_w - btn_w, cy,
-                                              btn_w, ctrl_h),
-                                  extra={"label": s.get("change_folder",
-                                                        "Change folder..."),
-                                         "small": True}))
-                cy += ctrl_h + gap
-            segmented("convert_codec", s.get("convert_codec", "Video codec"),
-                      str(self.state.get("convert_codec", "auto")),
-                      ["auto", "av1", "hevc", "h264"],
-                      labels=[s.get("convert_codec_auto", "Auto"),
-                              "AV1", "HEVC", "H.264"])
-            segmented("convert_quality", s.get("convert_quality", "Quality"),
-                      str(self.state.get("convert_quality", "high")),
-                      ["high", "balanced", "small"],
-                      labels=[s.get("convert_quality_high", "Best"),
-                              s.get("convert_quality_balanced", "Balanced"),
-                              s.get("convert_quality_small", "Smaller")])
-            segmented("convert_image_format",
-                      s.get("convert_image_format", "Image format"),
-                      str(self.state.get("convert_image_format", "keep")),
-                      ["keep", "png", "jpg"],
-                      labels=[s.get("convert_image_keep", "Original"),
-                              "PNG", "JPG"])
-            toggle("convert_audio", s.get("convert_audio", "Keep audio"),
-                   bool(self.state.get("convert_audio", True)))
-
         elif self.page == "settings":
             # Four tabs where six sections used to run one after another. The
             # page is where everything set once in a lifetime lives, and it
@@ -1728,150 +1608,17 @@ class OverlayMenu:
                    labels=[s.get("motion_nvofa", "NVOFA (experimental)"),
                            "CPU DIS"],
                    hint=s.get("motion_hint", "Restarts the worker; CPU fallback if unavailable"))
-            choice("screenshot_mode", s.get("screenshot_mode", "Screenshot saving"),
-                   str(self.state.get("screenshot_mode", "ask")),
-                   ["ask", "auto"],
-                   labels=[s.get("screenshot_ask", "Save As"),
-                           s.get("screenshot_auto", "Save automatically")])
-            # Three fixed options in the mockup, two in fact: BMP is not a
-            # format this app writes, and offering a value the program cannot
-            # honour is worse than showing one option fewer. The rule is the
-            # affordance - a fixed short list is a segment, only open-ended
-            # lists stay drop-downs.
-            segmented("screenshot_format", s.get("screenshot_format",
-                                                 "Screenshot format"),
-                      str(self.state.get("screenshot_format", "png")),
-                      ["png", "jpg"], labels=["PNG", "JPG"])
-            # The screenshot folder: the PATH and the action, side by side.
-            # It used to be one button whose caption carried the path, and a
-            # long path ate the caption. Now the destination is its own line
-            # (mono, elided in the middle so the drive and the last folder both
-            # survive) and the button says only what it does.
-            shot_dir = self.state.get("screenshot_dir") or ""
-            if show:
-                bgap = self._u(BTN_GAP)
-                btn_w = max(self._u(120), inner_w // 3)
-                path_rect = pygame.Rect(pad, cy, inner_w - btn_w - bgap,
-                                        ctrl_h)
-                items.append(Item("info", "shot_dir_path", path_rect,
-                                  extra={"label": "",
-                                         "value": self._elide_path(shot_dir)}))
-                items.append(Item("button", "shot_dir",
-                                  pygame.Rect(pad + inner_w - btn_w, cy,
-                                              btn_w, ctrl_h),
-                                  extra={"label": s.get("change_folder",
-                                                        "Change folder..."),
-                                         "small": True}))
-                cy += ctrl_h + gap
 
-            # Recording: everything about what leaves the program besides
-            # the screen itself. Spout2 (off by default) publishes the
-            # processed picture for external recorders; the recording
-            # indicator is a display preference of the same subject.
-            section(s["sec_recording"], "rec")
-            record_dir = self.state.get("recording_dir") or ""
-            record_label = s.get("record_dir_btn", "Recording folder...")
-            if record_dir:
-                record_label = f"{record_label}  ·  {record_dir}"
-            if show:
-                items.append(Item("button", "record_dir",
-                                  pygame.Rect(pad, cy, inner_w, ctrl_h),
-                                  extra={"label": record_label}))
-                cy += ctrl_h + gap
-            # On the GPU the recording costs no frame rate, but the worker
-            # never sees the menu window; off, the old path draws it in.
-            toggle("gpu_record", s.get("gpu_record", "Record on the GPU"),
-                   bool(self.state.get("gpu_record", True)),
-                   hint=s.get("gpu_record_hint", ""))
-            # #174: auto picks the best encoder that opens (AV1 on RTX 40/50),
-            # which some editors (Premiere) do not import.
-            segmented("record_codec", s.get("record_codec", "Recording codec"),
-                      str(self.state.get("record_codec", "auto")),
-                      ["auto", "av1", "hevc", "h264"],
-                      labels=[s.get("convert_codec_auto", "Auto"),
-                              "AV1", "HEVC", "H.264"])
-            toggle("spout", s.get("spout", "Spout2 output (OBS)"),
-                   bool(self.state.get("spout")),
-                   hint=s.get("spout_hint", ""))
-            toggle("rec_indicator", s.get("rec_indicator", "Recording indicator"),
-                   bool(self.state.get("rec_indicator", True)))
+            section(s["sec_behaviour"], "app")
             # The frame counter on screen and the corner it sits in (#109).
             # The corners are ARROWS, not words: four translated corner names
-            # would not fit a five-cell segment in any of the long languages,
-            # and an arrow needs no translation at all. Measured: every
-            # bundled face carries U+2196..U+2199.
+            # would not fit a five-cell segment in the long languages.
             segmented("fps_overlay",
                       s.get("fps_overlay", "Frame counter"),
                       str(self.state.get("fps_overlay", "off")),
                       ["off", "tl", "tr", "bl", "br"],
-                      # Five GLYPHS, including the off cell. The word did not
-                      # fit: es "desactivado" measured 112% of a fifth of the
-                      # row, it 99%, pt 101% - and a five-cell group has no
-                      # width to give. A cross beside four corner arrows reads
-                      # as "nowhere", the row label says what is being placed,
-                      # and none of the five needs translating.
-                      #
-                      # The dash, not a cross: U+2715 came out as tofu in the
-                      # panel's own face, and the dash is already this app's
-                      # word for "no reading" - the status line prints it when
-                      # there is no rate.
-                      labels=["—", "↖", "↗",
-                              "↙", "↘"])
-            rec_status = str(self.state.get("recording_status") or "")
-            rec_details = str(self.state.get("recording_details") or "")
-            rec_path = str(self.state.get("recording_path") or "")
-            for key, info_label, value in (
-                    ("record_status", s.get("record_state", "State"),
-                     s.get(f"record_status_{rec_status}", rec_status)),
-                    ("record_details", s.get("record_format", "Format"), rec_details),
-                    ("record_path", s.get("record_path", "Path"), rec_path)):
-                if show and value:
-                    items.append(Item("info", key,
-                                      pygame.Rect(pad, cy, inner_w,
-                                                  self._u(LABEL_H)),
-                                      extra={"label": info_label,
-                                             "value": value}))
-                    cy += self._u(LABEL_H) + self._u(4)
-
-            # File conversion. It belongs on this tab because this tab is
-            # about the ways a picture leaves the program: recording is the
-            # screen over time, this is a file on disk. The settings are not
-            # repeated here on purpose - a conversion uses the profile and
-            # the sliders the panel is already showing, so there is one place
-            # to tune the look and not two that can disagree.
-            section(s.get("sec_convert", "file conversion"), "rec")
-            busy = bool(self.state.get("convert_busy"))
-            if show:
-                # Opens the conversion page, where the queue and the output
-                # choices live; the main page's Convert cell goes there too.
-                items.append(Item("button", "convert",
-                                  pygame.Rect(pad, cy, inner_w, ctrl_h),
-                                  extra={"label": s.get(
-                                      "convert_pick", "Convert files..."),
-                                         "filled": False}))
-                cy += ctrl_h + gap
-                # One row that says either what is happening or what the
-                # button is for, so the section is never silent.
-                status = str(self.state.get("convert_status") or "")
-                if busy or status:
-                    items.append(Item("info", "convert_status",
-                                      pygame.Rect(pad, cy, inner_w,
-                                                  self._u(LABEL_H)),
-                                      extra={"label": s.get(
-                                          "record_state", "State") if busy else "",
-                                             "value": status}))
-                    cy += self._u(LABEL_H) + self._u(4)
-                else:
-                    # Idle, the row is what the button is for: a caption in
-                    # the hints' face, not a value in the numbers' mono one.
-                    text = s.get("convert_hint", "")
-                    note_h = self._note_height(text, inner_w)
-                    items.append(Item("note", "convert_status",
-                                      pygame.Rect(pad, cy, inner_w, note_h),
-                                      extra={"text": text}))
-                    cy += note_h + self._u(4)
-
-            section(s["sec_behaviour"], "app")
+                      labels=["\u2014", "\u2196", "\u2197",
+                              "\u2199", "\u2198"])
             toggle("open_on_start", s["open_on_start"],
                    bool(self.state.get("open_on_start")))
             toggle("autostart", s.get("autostart", "Autostart with Windows"),
@@ -2048,26 +1795,25 @@ class OverlayMenu:
                     # a full PAD on top of that was the second hole.
                     cy += act_h + self._u(6)
         else:
-            # The main page (v2.6.0, redesign B): the four switches people
-            # reach for during a game as tiles, the profile and its strength,
-            # then four fold-outs for the rest. The page it replaced ran to
-            # 1356 px at 100% - past a 1080p screen - and the camera added
-            # seven rows on top. Folded, this one fits; each fold names what
-            # is inside it, so a closed block still answers "what is set".
+            # The main page (compact window): three switches - NR, FG and
+            # Boost - the profile and its strength, and what Boost owns: the
+            # resolution the network runs at and the NR passes. Everything
+            # else the old page carried (camera, colour, the before/after
+            # wipe, the frame limiter, the interface-protection switch and
+            # the screenshot / record / convert strip) is gone: the frame
+            # limit is always unlimited and FG always protects the interface.
             nr_on = bool(self.state.get("nr"))
             fg = bool(self.state.get("frame_generation"))
             multiplier = int(self.state.get("frame_multiplier", 2))
             boost = bool(self.state.get("nr_small"))
-            lens_on = bool(self.state.get("lens"))
             on_s = s.get("tile_on", "On")
             off_s = s.get("tile_off", "Off")
             tile_gap = self._u(8)
             tile_h = self._u(TILE_H)
             tiles = (("nr", "NR", on_s if nr_on else off_s, nr_on),
                      ("frame_generation", "FG",
-                      f"×{multiplier}" if fg else off_s, fg),
-                     ("boost", s["boost"], on_s if boost else off_s, boost),
-                     ("lens", s["lens"], on_s if lens_on else off_s, lens_on))
+                      f"\u00d7{multiplier}" if fg else off_s, fg),
+                     ("boost", s["boost"], on_s if boost else off_s, boost))
             tile_w = (inner_w - tile_gap * (len(tiles) - 1)) // len(tiles)
             for idx, (key, label, value_text, on) in enumerate(tiles):
                 tx = pad + idx * (tile_w + tile_gap)
@@ -2081,8 +1827,7 @@ class OverlayMenu:
 
             # The multiplier, always on screen: a preference for the next
             # attempt as much as a live control. A step picked with FG off
-            # turns it on (commands.apply_menu_action) - one click, and a
-            # 40-series card that steps down is never stranded behind the tile.
+            # turns it on (commands.apply_menu_action).
             live = self.state.get("frame_multiplier_active")
             fg_hint = ""
             if fg and isinstance(live, int) and live != multiplier:
@@ -2091,12 +1836,11 @@ class OverlayMenu:
                     "the runtime caps this card at x{live} - FG runs there, "
                     "your x{want} is asked for again on the next attempt"
                 ).format(live=live, want=multiplier)
-            # Named "FSR FG", not "Frame multiplier": five cells leave
-            # 251 px for the caption, and the translated word needs up to 288
-            # (es) - test_fg_row_fits measures it in every language.
+            # Named "FSR FG", not "Frame multiplier": test_fg_row_fits
+            # measures the caption in every language.
             toggle("frame_multiplier", "FSR FG",
                    fg, hint=fg_hint, segments_only=True,
-                   inline_right=[(f"frame_multiplier:{m}", f"×{m}")
+                   inline_right=[(f"frame_multiplier:{m}", f"\u00d7{m}")
                                  for m in range(2, FG_MULTIPLIER_MAX + 1)])
             steps = list(range(2, FG_MULTIPLIER_MAX + 1))
             first = len(items) - len(steps)
@@ -2127,73 +1871,39 @@ class OverlayMenu:
 
             param_slider("intensity")
 
-            # The fold-outs. Each header carries a summary of what it holds.
-            limit_mode = str(self.state.get("frame_limit_mode", "unlimited"))
-            custom_fps = int(self.state.get("frame_limit_custom", 90))
-            limit_labels = {"30": s.get("frame_limit_30", "30 fps"),
-                            "60": s.get("frame_limit_60", "60 fps"),
-                            "custom": f"{custom_fps} fps",
-                            "unlimited": s.get("frame_limit_unlimited", "Unlimited")}
             passes_now = int(self.state.get("nr_passes", 1) or 1)
-            net_bits = []
+            # The work size and the cascade only exist under Boost: without
+            # it the network runs at the full frame and both would be
+            # controls that change nothing.
             if boost:
-                net_bits.append(str(self.state.get("work_size") or ""))
-                if passes_now > 1:
-                    net_bits.append(f"{s.get('nr_passes', 'NR passes')} {passes_now}")
-            net_bits.append(limit_labels.get(limit_mode, limit_mode))
-            if fold("net", s.get("fold_net", "Network"),
-                    " · ".join(b for b in net_bits if b)):
-                # FG's interface protection (v2.6.0): the real frame's pixels
-                # where a still HUD sits over a moving picture. Off by default
-                # until it is measured on more games.
-                toggle("fg_ui_protect", s.get("fg_ui_protect", "Protect the interface in FG"),
-                       bool(self.state.get("fg_ui_protect", False)),
-                       hint=s.get("fg_ui_protect_hint", ""))
-                # The hint says what the cap counts: source frames, which is
-                # why a 60 cap and a 170 fps FG reading are true together (#109).
-                choice("frame_limit_mode", s.get("frame_limit", "Frame limit"),
-                       limit_mode, ["30", "60", "custom", "unlimited"],
-                       labels=[s.get("frame_limit_30", "30 fps"),
-                               s.get("frame_limit_60", "60 fps"),
-                               s.get("frame_limit_custom", "Custom"),
-                               s.get("frame_limit_unlimited", "Unlimited")],
-                       hint=s.get("frame_limit_hint", ""))
-                if limit_mode == "custom":
-                    slider("frame_limit_custom", 15, 240, custom_fps,
-                           s.get("frame_limit_custom_value", "Custom limit"),
-                           value_text=f"{custom_fps} fps")
-                # The work size and the cascade only exist under Boost: without
-                # it the network runs at the full frame and both would be
-                # controls that change nothing (measured 12.09).
-                if boost:
-                    cap = float(self.state.get("work_scale_cap", 1.0))
-                    pos = float(self.state.get("work_scale", cap))
-                    work = str(self.state.get("work_size") or "")
-                    lo = float(self.state.get("work_scale_min", 0.1))
-                    slider("nr_res", lo, cap, pos, s["nr_res"],
-                           value_text=work if work else f"{pos:.2f}")
-                    segmented("nr_passes", s.get("nr_passes", "NR passes"),
-                              str(max(1, min(4, passes_now))),
-                              ["1", "2", "3", "4"], labels=["1", "2", "3", "4"])
-                    items[-1].extra["state_default"] = "1"
-                    per_pass = self.state.get("nr_pass_params") or {}
-                    if passes_now >= 2:
-                        toggle("pass_params", s.get("pass_params", "Own set"),
-                               bool(per_pass), s.get("pass_params_hint", ""))
-                        if per_pass:
-                            segmented("pass_style", s["style"],
-                                      str(int(per_pass.get("style", 1))),
-                                      ["0", "1", "2"],
-                                      labels=[s["style_0"], s["style_1"],
-                                              s["style_2"]])
-                            pdefaults = self.state.get("pass_param_defaults") or {}
-                            pranges = self.state.get("pass_param_ranges") or {}
-                            for key in PARAM_KEYS:
-                                lo, hi = pranges.get(key) or PARAM_FALLBACK
-                                val = float(per_pass.get(key, 0.0))
-                                slider(f"pass_{key}", float(lo), float(hi), val,
-                                       s[key], value_text=f"{val:.2f}",
-                                       mark=pdefaults.get(key))
+                cap = float(self.state.get("work_scale_cap", 1.0))
+                pos = float(self.state.get("work_scale", cap))
+                work = str(self.state.get("work_size") or "")
+                lo = float(self.state.get("work_scale_min", 0.1))
+                slider("nr_res", lo, cap, pos, s["nr_res"],
+                       value_text=work if work else f"{pos:.2f}")
+                segmented("nr_passes", s.get("nr_passes", "NR passes"),
+                          str(max(1, min(4, passes_now))),
+                          ["1", "2", "3", "4"], labels=["1", "2", "3", "4"])
+                items[-1].extra["state_default"] = "1"
+                per_pass = self.state.get("nr_pass_params") or {}
+                if passes_now >= 2:
+                    toggle("pass_params", s.get("pass_params", "Own set"),
+                           bool(per_pass), s.get("pass_params_hint", ""))
+                    if per_pass:
+                        segmented("pass_style", s["style"],
+                                  str(int(per_pass.get("style", 1))),
+                                  ["0", "1", "2"],
+                                  labels=[s["style_0"], s["style_1"],
+                                          s["style_2"]])
+                        pdefaults = self.state.get("pass_param_defaults") or {}
+                        pranges = self.state.get("pass_param_ranges") or {}
+                        for key in PARAM_KEYS:
+                            lo, hi = pranges.get(key) or PARAM_FALLBACK
+                            val = float(per_pass.get(key, 0.0))
+                            slider(f"pass_{key}", float(lo), float(hi), val,
+                                   s[key], value_text=f"{val:.2f}",
+                                   mark=pdefaults.get(key))
 
             style_now = int(self.state.get("style", 1))
             if fold("tune", s.get("fold_tune", "Fine tuning"),
@@ -2237,45 +1947,10 @@ class OverlayMenu:
                                              and not self.state.get("preset_active")}))
                 cy += act_h + gap
 
-            # The camera over the processed picture (native/lens.inl). Its
-            # on/off is the tile; the block holds what it does, and can be set
-            # up before it is turned on.
-            if fold("camera", s["lens"], on_s if lens_on else off_s):
-                bend = self.state.get("lens_bend", True) is not False
-                toggle("lens_bend", s["lens_bend"], bend)
-                if bend:
-                    lo, hi = self.state.get("lens_fov_range") or (60.0, 170.0)
-                    fov = float(self.state.get("lens_fov", 110.0))
-                    slider("lens_fov", float(lo), float(hi), fov, s["lens_fov"],
-                           value_text=f"{int(fov)}°", hint=s["lens_fov_hint"])
-                for key, default in (("lens_noise", 0.3), ("lens_vignette", 0.0),
-                                     ("lens_aberration", 0.0), ("lens_sensor", 0.0),
-                                     ("lens_soft", 0.0)):
-                    amount = float(self.state.get(key, default))
-                    slider(key, 0.0, 1.0, amount, s[key],
-                           value_text=f"{int(round(amount * 100))}%")
-
-            # The colour (#164): a block of its own, not the camera's - with
-            # five more sliders the camera block took 1500 px at 1080p, and
-            # the grading works with the camera off. Centred sliders, the
-            # tick at 0 is the picture as it is.
-            changed = sum(1 for key in COLOUR_KEYS
-                          if abs(float(self.state.get(key, 0.0))) >= 0.005)
-            if fold("colour", s.get("fold_colour", "Colour"),
-                    s.get("colour_changed", "Changed: {n}").format(n=changed) if changed
-                    else s.get("colour_as_is", "As it is")):
-                for key in COLOUR_KEYS:
-                    amount = float(self.state.get(key, 0.0))
-                    slider(key, -1.0, 1.0, amount, s[key],
-                           value_text=_signed_text(key, amount), mark=0.0)
-
             in_window = bool(self.state.get("window_mode"))
-            split_val = float(self.state.get("split", 0.0))
             src_bits = [s["mode_window"] if in_window else s["mode_fullscreen"]]
-            if split_val > 0:
-                src_bits.append(f"{int(round(split_val * 100))}%")
-            if fold("source", s.get("fold_source", "Source and comparison"),
-                    " · ".join(src_bits)):
+            if fold("source", s.get("sec_source", "source").capitalize(),
+                    " \u00b7 ".join(src_bits)):
                 segmented("source", "", "window" if in_window else "fullscreen",
                           ["fullscreen", "window"],
                           labels=[s["mode_fullscreen"], s["mode_window"]],
@@ -2302,76 +1977,7 @@ class OverlayMenu:
                                           else "Borderless, full monitor"),
                                              "filled": False}))
                     cy += act_h + gap
-                # Captioned, not bare: it was bare when a section of its own
-                # named it (user, 20.09); in the "Source and comparison" block
-                # the window's row sits right above it, and a bare track read
-                # as that window's size.
-                slider("split", 0.0, 1.0, split_val, s["split"],
-                       hint=s["split_hint"], ticks=11,
-                       value_text=f"{int(round(split_val * 100))}%")
             cy += self._u(10)
-            progress = self.state.get("convert_progress")
-            convert_label = s.get("convert", "Convert")
-            if isinstance(progress, (int, float)):
-                convert_label = f"{convert_label} {int(progress * 100)}%"
-            rows = (
-                (("screenshot", s["screenshot"]),
-                 ("record", (s.get("record_finalizing", "Finalizing...")
-                             if self.state.get("recording_finalizing")
-                             else s["record_stop_short"]
-                             if self.state.get("recording")
-                             else s["record"])),
-                 ("convert", convert_label)),
-            )
-            # The widest caption each cell will ever show: Record turns into
-            # Stop and Finalizing, Convert gains a percentage - measured at
-            # their longest, the cells do not move when the state changes.
-            ik = SMALL_SIZE / float(FONT_SIZE)
-            icon_w = int(round(self._u(17) * ik)) + self._u(9)
-            longest = {
-                "record": (s["record"], s["record_stop_short"],
-                           s.get("record_finalizing", "Finalizing...")),
-                "convert": (f"{s.get('convert', 'Convert')} 100%",),
-            }
-            for row in rows:
-                needs = [max(self._small_font.size(str(t))[0]
-                             for t in longest.get(key, (label,)))
-                         + icon_w + self._u(16)
-                         for key, label in row]
-                if all(n <= inner_w // len(row) for n in needs):
-                    # Equal thirds whenever every caption fits one.
-                    widths = [inner_w // len(row)] * len(row)
-                else:
-                    # Otherwise each cell takes what its caption needs and
-                    # the rest is shared - the FG row's rule, for the FG
-                    # row's reason: ja "スクリーンショット" is 126 px in its
-                    # own face, and a third of the strip leaves 123.
-                    spare = max(0, inner_w - sum(needs)) // len(row)
-                    widths = [n + spare for n in needs]
-                widths[-1] = inner_w - sum(widths[:-1])
-                x = pad
-                for idx, ((key, label), cw) in enumerate(zip(row, widths)):
-                    # One strip, its cells side by side - the SOURCE control's
-                    # look, which is what the page already uses for things
-                    # that belong together (user, 20.09).
-                    last = idx == len(row) - 1
-                    items.append(Item("button", key,
-                                      pygame.Rect(x, cy, cw, act_h),
-                                      extra={"label": label,
-                                             # The 1c rule: each capture action
-                                             # carries a 1.4 px line icon.
-                                             "icon": key if key in
-                                             ("screenshot", "record",
-                                              "convert") else None,
-                                             "filled": False,
-                                             "pair": ("left" if idx == 0
-                                                      else "right" if last
-                                                      else "mid"),
-                                             "disabled": (key == "record" and
-                                                          bool(self.state.get(
-                                                              "recording_finalizing")))}))
-                    x += cw
-                cy += act_h + self._u(8)
 
         # The footer: actions with the hotkey printed underneath. "Collapse"
         # and "Exit" used to look equally harmless, even though one hides the
@@ -2388,8 +1994,8 @@ class OverlayMenu:
         self._rule_rel = pygame.Rect(pad, cy, inner_w, 1)
         cy += self._u(14)
         act_h = self._u(ACTION_H)
-        if self.page in ("settings", "windows", "convert"):
-            if self.page in ("windows", "convert"):
+        if self.page in ("settings", "windows"):
+            if self.page == "windows":
                 # Back and the page's own action side by side. On the windows
                 # page that is Refresh: the list is frozen while the page is
                 # open (a re-read every frame made rows shuffle under the
@@ -2403,16 +2009,10 @@ class OverlayMenu:
                                   pygame.Rect(pad, cy, bw, act_h),
                                   extra={"label": s["back"],
                                          "filled": False}))
-                if self.page == "windows":
-                    items.append(Item("action", "refresh_windows",
-                                      pygame.Rect(pad + bw + bgap, cy, bw, act_h),
-                                      extra={"label": s.get("refresh_list",
-                                                            "Refresh list")}))
-                else:
-                    items.append(Item("action", "convert_add",
-                                      pygame.Rect(pad + bw + bgap, cy, bw, act_h),
-                                      extra={"label": s.get("convert_add",
-                                                            "Add files...")}))
+                items.append(Item("action", "refresh_windows",
+                                  pygame.Rect(pad + bw + bgap, cy, bw, act_h),
+                                  extra={"label": s.get("refresh_list",
+                                                        "Refresh list")}))
             else:
                 items.append(Item("action", "back",
                                   pygame.Rect(pad, cy, inner_w, act_h),
@@ -2649,21 +2249,8 @@ class OverlayMenu:
             return []
         out: list[tuple] = []
         if event.type == getattr(pygame, "DROPFILE", -1):
-            # A file dropped from Explorer. While the menu is open the layer
-            # takes the mouse across the whole screen, so a drop anywhere
-            # lands here (closed, the layer is click-through and the drop
-            # goes to whatever is underneath, as it should). Whatever the page,
-            # a dropped file means "convert this": the conversion page opens
-            # to show it joining the queue. SDL sends one event per file.
-            path = getattr(event, "file", None)
-            if path:
-                if self.page != "convert":
-                    self.page = "convert"
-                    self.scroll = 0
-                    self.capturing = None
-                    self.open_choice = None
-                    out.append(("capture", None))
-                out.append(("convert_files", [str(path)]))
+            # A file dropped from Explorer means nothing here any more: the
+            # conversion page is gone with the media tools.
             return out
         if self.capturing is not None and event.type == pygame.KEYDOWN:
             # While we wait for a key the keyboard belongs to the field. Esc
@@ -4749,8 +4336,7 @@ class OverlayMenu:
         multiplier = int(self.state.get("frame_multiplier", 2))
         tiles = (("nr", "NR", bool(self.state.get("nr"))),
                  ("frame_generation", f"FG ×{multiplier}" if fg else "FG", fg),
-                 ("boost", s["boost"], bool(self.state.get("nr_small"))),
-                 ("lens", s["lens"], bool(self.state.get("lens"))))
+                 ("boost", s["boost"], bool(self.state.get("nr_small"))))
         items: list[Item] = []
         x = edge + handle_w + gap
         for key, label, on in tiles:
@@ -4759,15 +4345,6 @@ class OverlayMenu:
                               value=1.0 if on else 0.0,
                               extra={"label": label, "compact": True}))
             x += tw + gap
-        x += self._u(6)
-        for key in ("screenshot", "record"):
-            items.append(Item("button", key, pygame.Rect(x, edge, btn_h, btn_h),
-                              extra={"label": s["screenshot"] if key == "screenshot"
-                                     else s["record"],
-                                     "icon": key, "bar": True,
-                                     "disabled": key == "record" and bool(
-                                         self.state.get("recording_finalizing"))}))
-            x += btn_h + gap
         x += self._u(6)
         iw = btn_h
         for key in ("mini", "min"):

@@ -57,14 +57,6 @@ def main() -> int:
             failures.append(f"{lang}: {len(lines)} lines in {rect.h} px")
         if lang == "ru":
             print(f"    ru: {len(lines)} lines: {lines}")
-        # The Media tab's idle conversion row is a caption, not a value: it
-        # was drawn in the numbers' mono face.
-        menu.settings_tab = "rec"
-        menu.layout(1920, 1080)
-        row = next((i for i in menu.items if i.key == "convert_status"), None)
-        if row is None or row.kind != "note" or row.extra.get("text") != s["convert_hint"]:
-            failures.append(f"{lang}: the idle conversion row is "
-                            f"{row and (row.kind, row.extra)}")
     pygame.quit()
 
     for f in failures:

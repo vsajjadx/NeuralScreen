@@ -154,9 +154,7 @@ def main() -> int:
     # The resolution slider is deliberately not here: it names the trade at
     # both ENDS of its track instead of under it, which is the same rule in
     # a better place.
-    expected = {"main/split",
-                "settings/monitor", "settings/gpu", "settings/hdr",
-                "settings/spout"}
+    expected = {"settings/monitor", "settings/gpu", "settings/hdr"}
     lost = sorted(k for k in expected if k not in seen_keys)
     if lost:
         failures.append(f"these hinted controls were not laid out: {lost} - "

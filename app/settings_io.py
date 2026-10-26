@@ -403,7 +403,13 @@ CONVERT_IMAGE_FORMATS = ("keep", "png", "jpg")
 
 
 def frame_limit_fps(cfg: dict) -> int:
-    """Resolve the persisted limiter mode to an FPS cap; zero is unlimited."""
+    """The FPS cap; zero is unlimited. The limiter is gone from the UI and the
+    cap is always off - an old config that still says 30/60/custom is ignored."""
+    return 0
+
+
+def _frame_limit_fps_legacy(cfg: dict) -> int:
+    """The old resolver, kept for the tests of the persisted values."""
     mode = str(cfg.get("frame_limit_mode", "unlimited"))
     if mode in ("30", "60"):
         return int(mode)
@@ -672,6 +678,16 @@ def _validate_config(cfg: dict) -> dict:
         custom = 90
     cfg["frame_limit_custom"] = min(
         FRAME_LIMIT_CUSTOM_MAX, max(FRAME_LIMIT_CUSTOM_MIN, custom))
+    # The compact window (2026-10): the limiter is always off, FG always
+    # protects the interface, and the camera, the colour grading and the
+    # before/after wipe are gone - whatever an old config.json says.
+    cfg["frame_limit_mode"] = "unlimited"
+    cfg["fg_ui_protect"] = True
+    cfg["lens"] = False
+    cfg["split"] = 0.0
+    for lens_key in ("lens_saturation", "lens_exposure", "lens_contrast",
+                     "lens_warmth", "lens_tint"):
+        cfg[lens_key] = 0.0
     for directory_key in ("recording_dir", "screenshot_dir", "convert_dir"):
         value = cfg.get(directory_key, "")
         cfg[directory_key] = value if isinstance(value, str) else ""

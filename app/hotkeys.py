@@ -102,10 +102,6 @@ DEFAULT_BINDINGS = {
     3: (MOD_NOREPEAT, VK_NUMPAD[6], "scale_up", "Num6"),
     4: (MOD_NOREPEAT, VK_NUMPAD[4], "scale_down", "Num4"),
     5: (MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_Q, "quit", "Ctrl+Alt+Q"),
-    # Num0 is the big key at the bottom of the block, and with Num Lock off it
-    # is the very Insert that used to start a recording.
-    6: (MOD_NOREPEAT, VK_NUMPAD[0], "record", "Num0"),
-    7: (MOD_NOREPEAT, VK_NUMPAD[3], "screenshot_menu", "Num3"),
     # One-window mode: the window that had the focus becomes the only thing
     # processed. Num5 is the middle of the block and free of any habit.
     8: (MOD_NOREPEAT, VK_NUMPAD[5], "window_mode", "Num5"),
@@ -117,10 +113,8 @@ DEFAULT_BINDINGS = {
     # a hyphen is typed far too often to belong to NeuralScreen.
     10: (MOD_NOREPEAT, VK_ADD, "nr_passes_up", "Numplus"),
     11: (MOD_NOREPEAT, VK_SUBTRACT, "nr_passes_down", "Numminus"),
-    # The camera on/off (#164): the effects are for a look, and a look is
-    # switched while the game runs, not two clicks deep in the menu. Num8,
-    # above the window key, was the block's last free digit near the others.
-    12: (MOD_NOREPEAT, VK_NUMPAD[8], "lens", "Num8"),
+    # Boost on/off (the compact window's third switch, next to NR and FG).
+    12: (MOD_NOREPEAT, VK_NUMPAD[8], "boost", "Num8"),
 }
 
 # Key name -> VK (for parsing the config)

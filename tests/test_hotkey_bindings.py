@@ -62,13 +62,13 @@ def main() -> int:
             failures.append(f"parse_binding({bad!r}) should be None")
 
     # 4. build_bindings: overrides apply, bad ones are ignored.
-    overrides = {"toggle": "F10", "record": "Ctrl+Insert", "settings": "NotAKey"}
+    overrides = {"toggle": "F10", "boost": "Ctrl+Insert", "settings": "NotAKey"}
     built = build_bindings(overrides)
     by_cmd = {entry[2]: entry for entry in built.values()}
     if by_cmd["toggle"][1] != 0x79:  # F10
         failures.append("toggle override did not apply (F10)")
-    if by_cmd["record"][1] != 0x2D:  # Insert
-        failures.append("record override did not apply (Ctrl+Insert)")
+    if by_cmd["boost"][1] != 0x2D:  # Insert
+        failures.append("boost override did not apply (Ctrl+Insert)")
     if by_cmd["settings"][1] != DEFAULT_BINDINGS[2][1]:
         failures.append("bad override replaced the default settings binding")
 

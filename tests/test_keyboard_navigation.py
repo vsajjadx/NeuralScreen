@@ -163,13 +163,13 @@ def main() -> int:
                 failures.append(f"second Esc emitted {second_esc}")
 
         # Enter/Space activate ordinary buttons and page navigation.
-        screenshot = _find(menu, "button", "screenshot")
-        if screenshot is None:
-            failures.append("no screenshot button")
+        boost_tile = _find(menu, "tile", "boost")
+        if boost_tile is None:
+            failures.append("no Boost tile")
         else:
-            menu._set_focus(screenshot)
-            if _press(menu, pygame.K_RETURN) != [("button", "screenshot")]:
-                failures.append("Enter did not activate the screenshot button")
+            menu._set_focus(boost_tile)
+            if _press(menu, pygame.K_RETURN) != [("toggle", "boost")]:
+                failures.append("Enter did not activate the Boost tile")
 
         gear = _find(menu, "icon", "gear")
         if gear is None:
