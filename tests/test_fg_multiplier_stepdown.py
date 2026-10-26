@@ -1,6 +1,6 @@
 """A refused multiplier steps down; it must not kill Frame Generation (issue #100).
 
-A card whose DLSS-G runtime stops at 2x answered a request for 3x/4x with a
+A provider whose FSR runtime stops at 2x answered a request for 3x/4x with a
 refusal. The worker treated that refusal as "Frame Generation does not work on
 this GPU": it set g_fg.failed, released everything, and every later frame went
 through the ordinary present path. The switch on the panel stayed on (or, with
@@ -40,20 +40,15 @@ def main() -> int:
         print("FAIL: the frame generation source is not readable")
         return 1
 
-    # --- the cap the runtime reports -------------------------------------
-    if "NVSDK_NGX_DLSSG_Parameter_MultiFrameCountMax" not in src:
-        failures.append("the worker never asks the runtime for its multiplier "
-                        "ceiling - a log from a 2x card does not name the reason")
-    if "NVSDK_NGX_D3D12_GetCapabilityParameters" not in src:
-        failures.append("the capability query is gone: the ceiling cannot be "
-                        "read from the runtime")
-    if "g_fg_cap_reported" not in src:
-        failures.append("the reported ceiling is not kept anywhere")
-    # Report-only: an unverified capability answer must not clamp a request
-    # that would otherwise have worked.
-    if re.search(r"g_fg_count_limit\s*=\s*std::min\(g_fg_count_limit", src):
-        failures.append("the reported ceiling clamps the request - an "
-                        "unverified answer can silently cost a working step")
+    # --- the provider the runtime picked -----------------------------------
+    # FSR has no multiplier-ceiling query: the step-down is what adapts. What
+    # is kept is which provider ran, so a log names it on the first attempt.
+    if "g_fg_provider_name" not in src or "FFX_API_QUERY_DESC_TYPE_GET_PROVIDER_VERSION" not in src:
+        failures.append("the provider the runtime picked is not queried or logged")
+    # A provider that refuses even 2x is rejected and the next one is tried
+    # before FG is declared impossible on this GPU.
+    if "g_fg_rejected_providers" not in src:
+        failures.append("a provider that refuses 2x is not set aside for the next one")
 
     # --- stepping down instead of failing --------------------------------
     if "FgStepDown" not in src:
@@ -63,18 +58,11 @@ def main() -> int:
         failures.append("the step-down has no 2x floor - it would keep "
                         "retrying below the only step the runtime may accept")
 
-    # Both refusal points must step down: the create (a runtime that refuses
-    # the count up front) and the evaluation (one that refuses per frame).
-    # The create runs under an SEH guard now (FgCreateGuarded); its result is
-    # judged after the fault check, before the depth texture is built.
-    create = re.search(r"const auto result = FgCreateGuarded\((.*?)CreateVideoTex\(g_fg\.depth",
-                       src, re.S)
-    if not create or "FgStepDown(result)" not in create.group(1):
-        failures.append("a refused CreateFeature does not step down")
-    evaluate = re.search(r"if \(NVSDK_NGX_FAILED\(result\)\)\s*\n\s*\{"
-                         r"(.*?)\n        \}", src, re.S)
+    # The dispatch refusing a step must step down (the context is created
+    # without a multiplier, so the create has nothing to step down from).
+    evaluate = re.search(r"if \(result != FFX_API_RETURN_OK\)\s*\n\s*\{(.*?)\n    \}", src, re.S)
     if not evaluate or "FgStepDown(result)" not in evaluate.group(1):
-        failures.append("a refused evaluation does not step down")
+        failures.append("a refused dispatch does not step down")
 
     # The request is clamped to the ceiling: without it the refused step is
     # asked for again on the next frame, forever.

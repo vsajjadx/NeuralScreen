@@ -132,7 +132,7 @@ def main() -> int:
     if not any("injecting failure at stage=fg-mode-changed" in ln for ln in lines):
         # SKIP only on the worker's own word that DLSS-G is not available here,
         # and never over a failure already collected.
-        unavailable = any(("[fg]" in ln and ("load failed" in ln or "CreateFeature failed" in ln
+        unavailable = any(("[fg]" in ln and ("load failed" in ln or "CreateContext failed" in ln
                                              or "BYO refused" in ln)) for ln in lines)
         if unavailable and not failures:
             print("SKIP: Frame Generation did not run here (DLSS-G unavailable)")

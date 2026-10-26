@@ -1,47 +1,98 @@
-// Experimental desktop DLSS-G. Capture has no engine depth: use a flat plane
-// and the estimated motion field. Keep this opt-in; UI/occlusions can distort.
-static PFN_NR_Evaluate g_fg_evaluate = nullptr;
-// The exception code of the last DLSS-G call that faulted inside NVIDIA's
-// runtime, 0 when it did not. NR's create and evaluate have always been
-// guarded so; DLSS-G's were not, and an old driver that faults instead of
-// refusing (#145's shape) took the whole worker down with FG on - no failure
-// line, a restart, and the same again on the next frame with FG.
-static DWORD g_fg_fault = 0;
-static NVSDK_NGX_Result FgEvaluateBridge(ID3D12GraphicsCommandList *list,
-    NVSDK_NGX_Handle *handle, NVSDK_NGX_Parameter *params, PFN_NVSDK_NGX_ProgressCallback cb)
-{
-    g_fg_fault = 0;
-    __try
-    {
-        if (TestFailureOnce("fg-evaluate-fault"))
-            RaiseException(EXCEPTION_ACCESS_VIOLATION, 0, 0, nullptr);
-        return g_fg_evaluate(list, handle, params, cb);
-    }
-    __except (EXCEPTION_EXECUTE_HANDLER) { g_fg_fault = GetExceptionCode(); }
-    return NVSDK_NGX_Result_Fail;
-}
+// Experimental desktop frame generation on AMD FSR (the FidelityFX API of FSR
+// SDK 2.3: FSR Frame Generation 4.0.1 and the legacy analytical provider that
+// ships in the same DLL). Capture has no engine depth: use a flat plane and the
+// estimated motion field. Keep this opt-in; UI/occlusions can distort.
+//
+// The worker owns its swap chain and its pacing (FgPresenter below), so the
+// FSR frame generation swap chain proxy is NOT used: the context only
+// interpolates (FFX_FRAMEGENERATION_FLAG_NO_SWAPCHAIN_CONTEXT_NOTIFY) into
+// textures this file allocates, and the presenter shows them as it always did.
+// Per frame the call order the SDK requires is ffxConfigure, then the prepare
+// dispatch (depth, motion vectors, camera), then the frame generation dispatch.
+#include "include/fsr/api/include/dx12/ffx_api_dx12.h"
+#include "include/fsr/framegeneration/include/ffx_framegeneration.h"
 
-static NVSDK_NGX_Result FgCreateGuarded(PFN_NR_Create create, ID3D12GraphicsCommandList *list,
-                                        const NVSDK_NGX_Parameter *params, NVSDK_NGX_Handle **out)
+// The FidelityFX entry points, bound at run time from the signed loader
+// (amd_fidelityfx_loader_dx12.dll), which in turn maps the effect DLL
+// amd_fidelityfx_framegeneration_dx12.dll that sits next to it. Bound by
+// GetProcAddress rather than an import library so that the absence of the AMD
+// runtime stays what the absence of the NVIDIA one was: the FG switch refuses
+// politely and nothing else breaks.
+static struct FfxApi {
+    HMODULE module = nullptr, provider = nullptr;
+    PfnFfxCreateContext create = nullptr;
+    PfnFfxDestroyContext destroy = nullptr;
+    PfnFfxConfigure configure = nullptr;
+    PfnFfxQuery query = nullptr;
+    PfnFfxDispatch dispatch = nullptr;
+} g_ffx;
+
+// The exception code of the last FidelityFX call that faulted inside AMD's
+// runtime, 0 when it did not. NR's create and evaluate have always been
+// guarded so; an old driver that faults instead of refusing (#145's shape)
+// would otherwise take the whole worker down with FG on - no failure line, a
+// restart, and the same again on the next frame with FG. Each call below is
+// its own function: __try cannot share a body with objects that unwind.
+static DWORD g_fg_fault = 0;
+static ffxReturnCode_t FgCreateGuarded(ffxContext *context, ffxCreateContextDescHeader *desc)
 {
     g_fg_fault = 0;
     __try
     {
         if (TestFailureOnce("fg-create-fault"))
             RaiseException(EXCEPTION_ACCESS_VIOLATION, 0, 0, nullptr);
-        return create(list, NVSDK_NGX_Feature_FrameGeneration, params, out);
+        return g_ffx.create(context, desc, nullptr);
     }
     __except (EXCEPTION_EXECUTE_HANDLER) { g_fg_fault = GetExceptionCode(); }
-    return NVSDK_NGX_Result_Fail;
+    return FFX_API_RETURN_ERROR;
 }
-#define NVSDK_NGX_D3D12_EvaluateFeature_C FgEvaluateBridge
-#include "include/nvsdk_ngx_helpers_dlssg.h"
-#undef NVSDK_NGX_D3D12_EvaluateFeature_C
+static ffxReturnCode_t FgConfigureGuarded(ffxContext *context, const ffxConfigureDescHeader *desc)
+{
+    g_fg_fault = 0;
+    __try { return g_ffx.configure(context, desc); }
+    __except (EXCEPTION_EXECUTE_HANDLER) { g_fg_fault = GetExceptionCode(); }
+    return FFX_API_RETURN_ERROR;
+}
+static ffxReturnCode_t FgDispatchGuarded(ffxContext *context, const ffxDispatchDescHeader *desc)
+{
+    g_fg_fault = 0;
+    __try
+    {
+        if (TestFailureOnce("fg-evaluate-fault"))
+            RaiseException(EXCEPTION_ACCESS_VIOLATION, 0, 0, nullptr);
+        return g_ffx.dispatch(context, desc);
+    }
+    __except (EXCEPTION_EXECUTE_HANDLER) { g_fg_fault = GetExceptionCode(); }
+    return FFX_API_RETURN_ERROR;
+}
+static ffxReturnCode_t FgQueryGuarded(ffxContext *context, ffxQueryDescHeader *desc)
+{
+    g_fg_fault = 0;
+    __try { return g_ffx.query(context, desc); }
+    __except (EXCEPTION_EXECUTE_HANDLER) { g_fg_fault = GetExceptionCode(); }
+    return FFX_API_RETURN_ERROR;
+}
+static ffxReturnCode_t FgDestroyGuarded(ffxContext *context)
+{
+    g_fg_fault = 0;
+    __try { return g_ffx.destroy(context, nullptr); }
+    __except (EXCEPTION_EXECUTE_HANDLER) { g_fg_fault = GetExceptionCode(); }
+    return FFX_API_RETURN_ERROR;
+}
 
-// The most generated frames per real one: DLSS 4.5 goes to 6x (#163) on the
-// cards whose runtime says so; a card that stops lower refuses the step and
-// FgStepDown walks it down, as it always did from 4x.
-static constexpr unsigned kFgMaxGenerated = 5;
+// What the runtime says about itself goes to the log (errors only): a refusal
+// then names its own reason instead of a bare return code.
+static void FgRuntimeMessage(uint32_t type, const wchar_t *message)
+{
+    Log("[fg] FidelityFX %s: %ls", type == FFX_API_MESSAGE_TYPE_ERROR ? "error" : "warning",
+        message != nullptr ? message : L"(no text)");
+}
+
+// The most generated frames per real one. The dispatch description carries
+// four output targets, so FSR frame generation goes to 5x (4 generated frames
+// per real one); a provider that stops lower refuses the step and FgStepDown
+// walks it down, as it always did.
+static constexpr unsigned kFgMaxGenerated = 4;
 
 struct FgSlot {
     winrt::com_ptr<ID3D12Resource> real, interpolated[kFgMaxGenerated];
@@ -52,14 +103,16 @@ struct FgSlot {
     double interval = 0.016;
 };
 static struct FgState {
-    HMODULE module = nullptr;
-    PFN_NR_Create create = nullptr;
-    PFN_NR_Release release = nullptr;
-    NVSDK_NGX_Parameter *params = nullptr;
-    NVSDK_NGX_Handle *feature = nullptr;
+    // The FidelityFX frame generation context, and the id and name of the
+    // provider it was created on (the newest the runtime offers for this GPU,
+    // or the one a refusal left over).
+    ffxContext context = nullptr;
+    uint64_t provider_id = 0;
     VideoTex depth;
     winrt::com_ptr<ID3D12Resource> output[kFgMaxGenerated];
-    winrt::com_ptr<ID3D12Resource> disable, disable_readback;
+    // FidelityFX wants a frame id that goes up by exactly one per frame; any
+    // other step resets the interpolation. Counted per context.
+    uint64_t frame_id = 0;
     UINT w = 0, height = 0, mw = 0, mh = 0;
     DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
     FgSlot slots[3];
@@ -96,25 +149,25 @@ static struct FgState {
 
 static int g_fg_ui_enabled = -1;
 static unsigned g_fg_count = 1;
-// What we actually ask the runtime for, 0-based: 1 = 2x, 3 = 4x, 5 = 6x.
+// What we actually ask the runtime for, 0-based: 1 = 2x, 3 = 4x, 4 = 5x.
 //
-// It starts at the DLSS 4.5 ceiling and drops only when a create or evaluation
-// is actually refused - the runtime itself answered "not that step". Two
-// refusals on a card that stops at 2x (4x, then 3x) land it on 2x and Frame
+// It starts at the 5x ceiling and drops only when a create or dispatch is
+// actually refused - the runtime itself answered "not that step". Refusals on
+// a provider that stops at 2x (5x, 4x, then 3x) land it on 2x and Frame
 // Generation keeps running; before this, the first refusal killed the feature
 // outright. Switching FG off and on re-arms the user's choice, so a newer
-// stock provider or driver update gets a fair try without a restart.
+// runtime or driver update gets a fair try without a restart.
 static unsigned g_fg_count_limit = kFgMaxGenerated;
 // Set when a refusal was answered by stepping the multiplier down: that frame
 // is a retry, not a failure. FgPresent reads and clears it.
 static bool g_fg_retry = false;
 
-// Report-only: what the runtime says its own ceiling is, through
-// DLSSG.MultiFrameCountMax (5 = 6x, 3 = 4x, 1 = 2x only). It is advisory and never
-// clamps the request - the step-down below is what adapts, because it is
-// driven by an answer this run actually got. The value is logged so that a
-// log from a card which stops at 2x names the reason on the first attempt.
-static unsigned g_fg_cap_reported = 0;
+// Providers that were created fine but refused to dispatch on this GPU (the
+// ML provider on a card without the hardware it needs, say), by provider id:
+// the next create skips them and takes the newest provider that is left. A
+// fact about the GPU, so it lasts as long as the process does.
+static std::vector<uint64_t> g_fg_rejected_providers;
+static const char *g_fg_provider_name = "";
 
 // Step the multiplier down after a refusal. True when a lower step remains to
 // try; false when 2x itself was refused, which is the real "cannot run here".
@@ -173,11 +226,25 @@ static void CloseFgResources()
 {
     StopFgPresentation();
     if (g_submission_failed) return;
-    if (g_fg.feature) { g_fg.release(g_fg.feature); g_fg.feature = nullptr; }
+    if (g_fg.context)
+    {
+        // The presenter stopped and every dispatch was waited on, so nothing
+        // in flight references the context's resources. The SDK asks for
+        // frame generation to be disabled before the context goes.
+        ffxConfigureDescFrameGeneration off = {};
+        off.header.type = FFX_API_CONFIGURE_DESC_TYPE_FRAMEGENERATION;
+        off.frameGenerationEnabled = false;
+        off.flags = FFX_FRAMEGENERATION_FLAG_NO_SWAPCHAIN_CONTEXT_NOTIFY;
+        off.frameID = g_fg.frame_id;
+        FgConfigureGuarded(&g_fg.context, &off.header);
+        FgDestroyGuarded(&g_fg.context);
+        g_fg.context = nullptr;
+    }
+    g_fg.provider_id = 0;
+    g_fg.frame_id = 0;
     if (g_fg.depth.tex) { g_fg.depth.tex->Release(); g_fg.depth.tex = nullptr; }
     if (g_fg.depth.upload) { g_fg.depth.upload->Release(); g_fg.depth.upload = nullptr; }
     for (auto &image : g_fg.output) image = nullptr;
-    g_fg.disable = nullptr; g_fg.disable_readback = nullptr;
     g_fg.w = g_fg.height = 0;
 }
 
@@ -310,7 +377,7 @@ static void FgPresenter()
         HRESULT pr = g_present_swap->Present(0, 0);
         if (TestFailureOnce("fg-mode-changed")) pr = DXGI_STATUS_MODE_CHANGED;
         // A change still IN PROGRESS loses this frame and nothing more: a
-        // rebuild here would recreate the DLSS-G feature and the window on
+        // rebuild here would recreate the FSR context and the window on
         // every present for as long as the transition lasts (another app's
         // fullscreen switch, say). The ordinary path pays no feature create,
         // so it may rebuild on both; FG waits for MODE_CHANGED.
@@ -432,121 +499,228 @@ static void FgPresenter()
     if (g_fg.failed) Log("[fg] presenter failed; returning to ordinary output");
 }
 
+// Maps the FidelityFX runtime out of one folder: the effect DLL first, by full
+// path, then the loader. The loader looks for the effect DLL by name, and a
+// module of that name already mapped is what Windows hands it - so both come
+// from the same folder whichever folder that is (the BYO folder or native\).
+// A BYO pair passes the AMD signature gate first; the bundled pair is the
+// shipped one and is loaded as it always was.
+static void FgUnloadRuntime()
+{
+    g_ffx.create = nullptr; g_ffx.destroy = nullptr; g_ffx.configure = nullptr;
+    g_ffx.query = nullptr; g_ffx.dispatch = nullptr;
+    if (g_ffx.module) { FreeLibrary(g_ffx.module); g_ffx.module = nullptr; }
+    if (g_ffx.provider) { FreeLibrary(g_ffx.provider); g_ffx.provider = nullptr; }
+}
+
+static bool FgMapRuntime(const wchar_t *directory, bool byo)
+{
+    wchar_t provider_path[MAX_PATH], loader_path[MAX_PATH];
+    wcscpy_s(provider_path, directory);
+    wcscat_s(provider_path, L"amd_fidelityfx_framegeneration_dx12.dll");
+    wcscpy_s(loader_path, directory);
+    wcscat_s(loader_path, L"amd_fidelityfx_loader_dx12.dll");
+    if (GetFileAttributesW(loader_path) == INVALID_FILE_ATTRIBUTES ||
+        GetFileAttributesW(provider_path) == INVALID_FILE_ATTRIBUTES)
+        return false;
+    if (byo)
+    {
+        // A writable folder next to the executable is the easiest DLL plant:
+        // both files are verified (AMD signature, machine-root chain, product
+        // name) before either is mapped.
+        if (!NsGateByoDllAmd(provider_path, "amd_fidelityfx_framegeneration_dx12.dll") ||
+            !NsGateByoDllAmd(loader_path, "amd_fidelityfx_loader_dx12.dll"))
+        {
+            Log("[fg] BYO refused: the FidelityFX files in native\\libraries\\ are not "
+                "AMD-signed runtimes - falling back to the bundled copy (%ls)", loader_path);
+            return false;
+        }
+    }
+    g_ffx.provider = LoadLibraryExW(provider_path, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+    if (!g_ffx.provider)
+    {
+        Log("[fg] amd_fidelityfx_framegeneration_dx12.dll load failed: %lu", GetLastError());
+        return false;
+    }
+    g_ffx.module = LoadLibraryExW(loader_path, nullptr, LOAD_WITH_ALTERED_SEARCH_PATH);
+    if (!g_ffx.module)
+    {
+        Log("[fg] amd_fidelityfx_loader_dx12.dll load failed: %lu", GetLastError());
+        FgUnloadRuntime();
+        return false;
+    }
+    // Any failure from here on unloads the runtime again. The module was the
+    // only "initialised" marker, so a half-done init (an export missing)
+    // must not be kept: the next FG switch-on would skip this block and call
+    // create through pointers never bound.
+    g_ffx.create = reinterpret_cast<PfnFfxCreateContext>(GetProcAddress(g_ffx.module, "ffxCreateContext"));
+    g_ffx.destroy = reinterpret_cast<PfnFfxDestroyContext>(GetProcAddress(g_ffx.module, "ffxDestroyContext"));
+    g_ffx.configure = reinterpret_cast<PfnFfxConfigure>(GetProcAddress(g_ffx.module, "ffxConfigure"));
+    g_ffx.query = reinterpret_cast<PfnFfxQuery>(GetProcAddress(g_ffx.module, "ffxQuery"));
+    g_ffx.dispatch = reinterpret_cast<PfnFfxDispatch>(GetProcAddress(g_ffx.module, "ffxDispatch"));
+    if (!g_ffx.create || !g_ffx.destroy || !g_ffx.configure || !g_ffx.query || !g_ffx.dispatch)
+    {
+        Log("[fg] the FidelityFX runtime is missing an entry point");
+        FgUnloadRuntime();
+        return false;
+    }
+    return true;
+}
+
+// One attempt at a frame generation context: the provider the runtime picks by
+// itself (use_override false), or a named one.
+static ffxReturnCode_t FgCreateContext(UINT w, UINT height, UINT mw, UINT mh,
+                                       DXGI_FORMAT format, bool use_override, uint64_t provider)
+{
+    ffxCreateBackendDX12Desc backend = {};
+    backend.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_BACKEND_DX12;
+    backend.device = h.dev;
+    ffxOverrideVersion override_version = {};
+    override_version.header.type = FFX_API_DESC_TYPE_OVERRIDE_VERSION;
+    override_version.versionId = provider;
+    backend.header.pNext = use_override ? &override_version.header : nullptr;
+    ffxCreateContextDescFrameGenerationVersion version = {};
+    version.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_FRAMEGENERATION_VERSION;
+    version.header.pNext = &backend.header;
+    version.version = FFX_FRAMEGENERATION_VERSION;
+    ffxCreateContextDescFrameGeneration create = {};
+    create.header.type = FFX_API_CREATE_CONTEXT_DESC_TYPE_FRAMEGENERATION;
+    create.header.pNext = &version.header;
+    create.flags = format == DXGI_FORMAT_R10G10B10A2_UNORM ? FFX_FRAMEGENERATION_ENABLE_HIGH_DYNAMIC_RANGE : 0u;
+    create.displaySize = {w, height};
+    create.maxRenderSize = {mw, mh};
+    create.backBufferFormat = ffxApiGetSurfaceFormatDX12(format);
+    g_fg.context = nullptr;
+    return FgCreateGuarded(&g_fg.context, &create.header);
+}
+
+static void FgNameProvider()
+{
+    static char name[96];
+    name[0] = 0;
+    g_fg.provider_id = 0;
+    if (g_fg.context == nullptr) { g_fg_provider_name = name; return; }
+    ffxQueryGetProviderVersion pv = {};
+    pv.header.type = FFX_API_QUERY_DESC_TYPE_GET_PROVIDER_VERSION;
+    if (FgQueryGuarded(&g_fg.context, &pv.header) == FFX_API_RETURN_OK)
+    {
+        g_fg.provider_id = pv.versionId;
+        if (pv.versionName != nullptr) strncpy_s(name, pv.versionName, _TRUNCATE);
+    }
+    g_fg_provider_name = name;
+}
+
+static bool FgProviderRejected(uint64_t id)
+{
+    return std::find(g_fg_rejected_providers.begin(), g_fg_rejected_providers.end(), id)
+           != g_fg_rejected_providers.end();
+}
+
 static bool EnsureFg(VideoState &v, DXGI_FORMAT format)
 {
     const UINT w = v.upscale ? v.full_w : v.w, height = v.upscale ? v.full_h : v.hgt;
-    if (g_fg.feature && g_fg.w == w && g_fg.height == height && g_fg.mw == v.w &&
+    if (g_fg.context && g_fg.w == w && g_fg.height == height && g_fg.mw == v.w &&
         g_fg.mh == v.hgt && g_fg.format == format && g_fg.thread.joinable()) return true;
     CloseFgResources();
-    if (!g_fg.module)
+    if (!g_ffx.module)
     {
         // The BYO library folder next to the worker, then the worker's own
-        // directory: users drop nvngx_dlssg.dll into native\libraries\ to
-        // pick the build they want, and native\ stays the bundled fallback.
+        // directory: users drop the AMD FidelityFX DLLs into native\libraries\
+        // to pick the build they want, and native\ stays the bundled fallback.
         wchar_t path[MAX_PATH] = {};
         GetModuleFileNameW(nullptr, path, MAX_PATH);
         if (auto slash = wcsrchr(path, L'\\')) *(slash + 1) = 0;
         wchar_t directory[MAX_PATH]; wcscpy_s(directory, path);
         wchar_t libraries[MAX_PATH]; wcscpy_s(libraries, directory);
         wcscat_s(libraries, L"libraries\\");
-        wchar_t lib_path[MAX_PATH]; wcscpy_s(lib_path, libraries);
-        wcscat_s(lib_path, L"nvngx_dlssg.dll");
-        if (GetFileAttributesW(lib_path) != INVALID_FILE_ATTRIBUTES)
+        bool mapped = FgMapRuntime(libraries, true);
+        if (mapped) Log("[fg] FG runtime from native\\libraries\\ (BYO, verified AMD signature)");
+        if (!mapped) mapped = FgMapRuntime(directory, false);
+        if (!mapped)
         {
-            // The BYO file is verified (NVIDIA signature, machine-root
-            // chain, product name) before it is mapped - a writable folder
-            // next to the executable is otherwise the easiest DLL plant.
-            if (NsGateByoDll(lib_path, "nvngx_dlssg.dll"))
-            {
-                g_fg.module = LoadLibraryW(lib_path);
-                if (g_fg.module)
-                    Log("[fg] FG runtime from native\\libraries\\ (BYO, "
-                        "verified NVIDIA signature)");
-            }
-            else
-                Log("[fg] BYO refused: nvngx_dlssg.dll is not a "
-                    "NVIDIA-signed runtime - falling back to the bundled "
-                    "copy (%ls)", lib_path);
-        }
-        if (!g_fg.module)
-        {
-            wcscpy_s(path, directory);
-            wcscat_s(path, L"nvngx_dlssg.dll");
-            g_fg.module = LoadLibraryW(path);
-        }
-        if (!g_fg.module) { Log("[fg] nvngx_dlssg.dll load failed: %lu", GetLastError()); return false; }
-        // Any failure from here on unloads the runtime again. The module was
-        // the only "initialised" marker, so a half-done init (an export
-        // missing, AllocateParameters or Init_Ext refused) used to be kept:
-        // the next FG switch-on skipped this block and called create on a
-        // runtime never initialised, through params that could be null.
-        auto unload = [] {
-            if (g_fg.params) { NVSDK_NGX_D3D12_DestroyParameters(g_fg.params); g_fg.params = nullptr; }
-            g_fg.create = nullptr; g_fg.release = nullptr; g_fg_evaluate = nullptr;
-            FreeLibrary(g_fg.module); g_fg.module = nullptr;
+            Log("[fg] amd_fidelityfx_loader_dx12.dll load failed: %lu", GetLastError());
             return false;
-        };
-        auto init = reinterpret_cast<PFN_NR_InitExt>(GetProcAddress(g_fg.module, "NVSDK_NGX_D3D12_Init_Ext"));
-        g_fg.create = reinterpret_cast<PFN_NR_Create>(GetProcAddress(g_fg.module, "NVSDK_NGX_D3D12_CreateFeature"));
-        g_fg.release = reinterpret_cast<PFN_NR_Release>(GetProcAddress(g_fg.module, "NVSDK_NGX_D3D12_ReleaseFeature"));
-        g_fg_evaluate = reinterpret_cast<PFN_NR_Evaluate>(GetProcAddress(g_fg.module, "NVSDK_NGX_D3D12_EvaluateFeature"));
-        if (!init || !g_fg.create || !g_fg.release || !g_fg_evaluate ||
-            NVSDK_NGX_FAILED(NVSDK_NGX_D3D12_AllocateParameters(&g_fg.params)))
-        { Log("[fg] the runtime is missing an entry point or parameters"); return unload(); }
-        auto result = init(0x1000000ULL, directory, h.dev, NVSDK_NGX_Version_API, g_fg.params);
-        if (TestFailureOnce("fg-init")) result = NVSDK_NGX_Result_Fail;
-        Log("[fg] Init_Ext -> 0x%08X", result);
-        if (NVSDK_NGX_FAILED(result)) return unload();
-        // Ask the runtime what it says its own multiplier ceiling is, and log
-        // it. DLSSG.MultiFrameCountMax is 5 for 6x, 3 for 4x and 1 for a card that stops
-        // at 2x. This is REPORT ONLY: the request is not clamped by it, since
-        // an unverified capability answer must not silently cost a working
-        // step. What adapts is FgStepDown, driven by a refusal this run really
-        // got. A log from a 2x card then names the reason on the first attempt
-        // instead of leaving the two refused steps unexplained.
-        NVSDK_NGX_Parameter *caps = nullptr;
-        if (!NVSDK_NGX_FAILED(NVSDK_NGX_D3D12_GetCapabilityParameters(&caps)) && caps != nullptr)
-        {
-            unsigned reported = 0;
-            if (!NVSDK_NGX_FAILED(caps->Get(NVSDK_NGX_DLSSG_Parameter_MultiFrameCountMax, &reported)) &&
-                reported >= 1u)
-            {
-                g_fg_cap_reported = std::min(kFgMaxGenerated, reported);
-                Log("[fg] the runtime reports a %ux multiplier ceiling",
-                    g_fg_cap_reported + 1);
-            }
-            NVSDK_NGX_D3D12_DestroyParameters(caps);
         }
+        if (TestFailureOnce("fg-init"))
+        {
+            Log("[fg] Init -> 0x%08X", static_cast<unsigned>(FFX_API_RETURN_ERROR));
+            FgUnloadRuntime();
+            return false;
+        }
+        ffxConfigureDescGlobalDebug1 debug = {};
+        debug.header.type = FFX_API_CONFIGURE_DESC_TYPE_GLOBALDEBUG1;
+        debug.fpMessage = FgRuntimeMessage;
+        debug.debugLevel = FFX_API_CONFIGURE_GLOBALDEBUG_LEVEL_ERRORS;
+        FgConfigureGuarded(nullptr, &debug.header);
+        Log("[fg] Init -> 0x%08X", static_cast<unsigned>(FFX_API_RETURN_OK));
     }
-    auto p = g_fg.params;
-    p->Reset();
-    p->Set("CreationNodeMask", 1u); p->Set("VisibilityNodeMask", 1u);
-    p->Set("Width", w); p->Set("Height", height);
-    p->Set(NVSDK_NGX_DLSSG_Parameter_BackbufferFormat, (unsigned)format);
-    p->Set(NVSDK_NGX_DLSSG_Parameter_InternalWidth, v.w);
-    p->Set(NVSDK_NGX_DLSSG_Parameter_InternalHeight, v.hgt);
-    p->Set(NVSDK_NGX_DLSSG_Parameter_DynamicResolution, 0u);
-    if (!BeginCommands()) return false;
-    const auto result = FgCreateGuarded(g_fg.create, h.list, p, &g_fg.feature);
+    // The provider the runtime picks for this GPU is the newest one (FSR Frame
+    // Generation 4, the ML one, where the hardware has it). A provider that
+    // cannot be created here - or one an earlier dispatch refused - is not the
+    // end of the feature: the runtime ships the older analytical provider as
+    // well, and that one runs on any Shader Model 6.2 GPU. So the list of
+    // providers is walked until one takes.
+    ffxReturnCode_t created = FgCreateContext(w, height, v.w, v.hgt, format, false, 0);
     if (g_fg_fault != 0)
     {
-        // Never execute a list NVIDIA's runtime faulted in, never trust a
-        // handle it may have half-written; FG is off for this session.
-        AbortCommands();
-        g_fg.feature = nullptr;
+        g_fg.context = nullptr;
         ReportFailure("fg-create", "seh", static_cast<HRESULT>(g_fg_fault));
-        Log("[fg] CreateFeature raised 0x%08X (caught) - Frame Generation off", g_fg_fault);
+        Log("[fg] CreateContext raised 0x%08X (caught) - Frame Generation off", g_fg_fault);
         return false;
     }
-    if (!WaitFenceValue(h.fence, EndCommands(), 30000) || NVSDK_NGX_FAILED(result) || !g_fg.feature)
+    if (created == FFX_API_RETURN_OK)
     {
-        Log("[fg] CreateFeature failed 0x%08X", result);
-        // The frame that met the refusal is a retry, not a dead feature: mark
-        // it so the caller lets the next header rebuild at the lower step
-        // instead of turning Frame Generation off for this GPU.
-        g_fg_retry = FgStepDown(result);
+        FgNameProvider();
+        if (g_fg.provider_id != 0 && FgProviderRejected(g_fg.provider_id))
+        {
+            Log("[fg] provider %s refused to run on this GPU earlier - trying the others", g_fg_provider_name);
+            FgDestroyGuarded(&g_fg.context);
+            g_fg.context = nullptr;
+            created = FFX_API_RETURN_ERROR;
+        }
+    }
+    else
+        Log("[fg] CreateContext (default provider) failed 0x%08X - trying the other providers", static_cast<unsigned>(created));
+    if (created != FFX_API_RETURN_OK)
+    {
+        uint64_t count = 0;
+        ffxQueryDescGetVersions list = {};
+        list.header.type = FFX_API_QUERY_DESC_TYPE_GET_VERSIONS;
+        list.createDescType = FFX_API_CREATE_CONTEXT_DESC_TYPE_FRAMEGENERATION;
+        list.device = h.dev;
+        list.outputCount = &count;
+        if (FgQueryGuarded(nullptr, &list.header) == FFX_API_RETURN_OK && count > 0 && count < 64)
+        {
+            std::vector<uint64_t> ids(static_cast<size_t>(count));
+            std::vector<const char *> names(static_cast<size_t>(count));
+            list.outputCount = &count;
+            list.versionIds = ids.data();
+            list.versionNames = names.data();
+            if (FgQueryGuarded(nullptr, &list.header) == FFX_API_RETURN_OK)
+            {
+                for (uint64_t i = 0; i < count && created != FFX_API_RETURN_OK; ++i)
+                {
+                    if (FgProviderRejected(ids[static_cast<size_t>(i)])) continue;
+                    created = FgCreateContext(w, height, v.w, v.hgt, format, true, ids[static_cast<size_t>(i)]);
+                    Log("[fg] CreateContext on provider %s -> 0x%08X",
+                        names[static_cast<size_t>(i)] != nullptr ? names[static_cast<size_t>(i)] : "?",
+                        static_cast<unsigned>(created));
+                    if (g_fg_fault != 0) { g_fg.context = nullptr; created = FFX_API_RETURN_ERROR; }
+                    if (created == FFX_API_RETURN_OK) FgNameProvider();
+                }
+            }
+        }
+    }
+    if (created != FFX_API_RETURN_OK || g_fg.context == nullptr)
+    {
+        // No provider takes this GPU/format: this is not a multiplier the
+        // runtime refused, so there is no step to walk down to.
+        Log("[fg] CreateContext failed 0x%08X - no frame generation provider can run here",
+            static_cast<unsigned>(created));
+        g_fg.context = nullptr;
         return false;
     }
+    Log("[fg] FSR provider: %s", g_fg_provider_name);
     if (!CreateVideoTex(g_fg.depth, v.w, v.hgt, DXGI_FORMAT_R32_FLOAT, v.w * 4)) return false;
     std::vector<float> depth(static_cast<size_t>(v.w) * v.hgt, 0.5f);
     if (!FillUpload(g_fg.depth, reinterpret_cast<BYTE *>(depth.data()), v.w * 4, v.hgt) || !BeginCommands()) return false;
@@ -582,18 +756,6 @@ static bool EnsureFg(VideoState &v, DXGI_FORMAT format)
         h.list->ResourceBarrier(1, &to_copy);
     }
     if (!WaitFenceValue(h.fence, EndCommands(), 30000)) return false;
-    D3D12_RESOURCE_DESC buffer = {};
-    buffer.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
-    buffer.Width = 4 * kFgMaxGenerated; buffer.Height = 1; buffer.DepthOrArraySize = 1;
-    buffer.MipLevels = 1; buffer.SampleDesc.Count = 1;
-    buffer.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
-    buffer.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
-    D3D12_HEAP_PROPERTIES heap = {}; heap.Type = D3D12_HEAP_TYPE_DEFAULT;
-    if (FAILED(h.dev->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &buffer,
-        D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(g_fg.disable.put())))) return false;
-    heap.Type = D3D12_HEAP_TYPE_READBACK; buffer.Flags = D3D12_RESOURCE_FLAG_NONE;
-    if (FAILED(h.dev->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &buffer,
-        D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(g_fg.disable_readback.put())))) return false;
     g_fg.w = w; g_fg.height = height; g_fg.mw = v.w; g_fg.mh = v.hgt; g_fg.format = format;
     g_fg.stop = false;
     if (g_fg.stop_event != nullptr) ResetEvent(g_fg.stop_event);
@@ -628,7 +790,7 @@ static bool EnsureFg(VideoState &v, DXGI_FORMAT format)
         }
     }
     g_fg.thread = std::thread(FgPresenter);
-    Log("[fg] %ux enabled at %ux%u, format=%u; flat depth and estimated motion (experimental)", g_fg_count + 1, w, height, format);
+    Log("[fg] %ux enabled at %ux%u, format=%u; FSR %s; flat depth and estimated motion (experimental)", g_fg_count + 1, w, height, format, g_fg_provider_name);
     return true;
 }
 
@@ -691,8 +853,8 @@ static void ExportFgSource(VideoState &v, bool bypass)
 
 // A picture the capture did not renew is not a frame to generate from (#132).
 // A pointer-only DDA update or a WGC pool with nothing new hands over the
-// same pixels; taken as a new real frame it cost a full set of DLSS-G
-// evaluates, and its slot - a few ms after the real one - superseded the
+// same pixels; taken as a new real frame it cost a full set of FSR
+// dispatches, and its slot - a few ms after the real one - superseded the
 // generated frames of the real step. Nothing is queued, so the presenter
 // keeps what it is showing (flip model: the last frame stays on screen). The
 // export still runs, as it did for every frame, and the fence is the token
@@ -756,72 +918,125 @@ static bool FgPresent(VideoState &v, ID3D12Resource *color, D3D12_RESOURCE_STATE
     const bool interpolate = g_fg.history && g_fg_source_fresh && !g_fg_reset && interval < 0.1;
     g_fg.last_slot = now;
     if (g_fg_source_fresh) { g_fg.last = now; g_fg.last_source = g_fg_source_seconds; }
-    auto p = g_fg.params;
-    p->Reset();
-    NVSDK_NGX_DLSSG_Opt_Eval_Params opt = {};
-    for (int i = 0; i < 4; ++i)
-        opt.cameraViewToClip[i][i] = opt.clipToCameraView[i][i] = opt.clipToLensClip[i][i] =
-        opt.clipToPrevClip[i][i] = opt.prevClipToClip[i][i] = 1.0f;
-    opt.mvecScale[0] = 1.f / v.w; opt.mvecScale[1] = 1.f / v.hgt;
-    opt.cameraUp[1] = opt.cameraRight[0] = opt.cameraFwd[2] = 1;
-    opt.cameraNear = 0.1f; opt.cameraFar = 1000; opt.cameraFOV = 1;
-    opt.cameraAspectRatio = float(g_fg.w) / g_fg.height;
-    opt.cameraMotionIncluded = opt.orthoProjection = opt.motionVectorsDilated = true;
-    opt.colorBuffersHDR = g_fg.format == DXGI_FORMAT_R10G10B10A2_UNORM;
-    opt.reset = !interpolate;
-    opt.mvecsSubrectSize = opt.depthSubrectSize = {v.w, v.hgt};
-    opt.backbufferSubrectSize = opt.outputInterpSubrectSize = {g_fg.w, g_fg.height};
-    NVSDK_NGX_D3D12_DLSSG_Eval_Params ep = {};
-    ep.pBackbuffer = color; ep.pMVecs = v.mv.tex; ep.pDepth = g_fg.depth.tex;
     if (!BeginCommands()) { g_fg.failed = true; CloseFgResources(); return false; }
     const bool profile_fg = ProfileGpuBegin(PS_FG);
-    bool allow_interpolation = true;
-    p->Set(NVSDK_NGX_DLSSG_Parameter_BackbufferFrameID, static_cast<unsigned long long>(g_fg.sequence + 1));
-    opt.multiFrameCount = g_fg_count;
+    const bool allow_interpolation = true;
+    const bool hdr = g_fg.format == DXGI_FORMAT_R10G10B10A2_UNORM;
+    // FidelityFX takes the frame id as the thread through the frames: it goes
+    // up by exactly one per frame, and any other step resets the
+    // interpolation. A frame that is not interpolated says so as well.
+    const uint64_t frame_id = ++g_fg.frame_id;
+    const bool reset = !interpolate;
+    // The picture the generated frames are built from rests as a compute
+    // read for the dispatch; the outputs as UAVs.
+    auto pre = Transition(color, state, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
+    if (state != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) h.list->ResourceBarrier(1, &pre);
     for (unsigned index = 0; index < g_fg_count; ++index)
     {
-        opt.multiFrameIndex = index + 1;
-        ep.pOutputInterpFrame = g_fg.output[index].get();
-        ep.pOutputDisableInterpolation = g_fg.disable.get();
-        auto pre = Transition(color, state, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE);
-        if (state != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) h.list->ResourceBarrier(1, &pre);
         auto out_pre = Transition(g_fg.output[index].get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
         h.list->ResourceBarrier(1, &out_pre);
-        const auto result = NGX_D3D12_EVALUATE_DLSSG(h.list, g_fg.feature, p, &ep, &opt);
-        if (g_fg_fault != 0)
-        {
-            AbortCommands();
-            ReportFailure("fg-evaluate", "seh", static_cast<HRESULT>(g_fg_fault));
-            Log("[fg] Evaluate raised 0x%08X (caught) - Frame Generation off", g_fg_fault);
-            g_fg.failed = true;
-            return false;
-        }
-        auto disable_pre = Transition(g_fg.disable.get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
-        h.list->ResourceBarrier(1, &disable_pre);
-        h.list->CopyBufferRegion(g_fg.disable_readback.get(), index * 4, g_fg.disable.get(), 0, 4);
-        auto disable_post = Transition(g_fg.disable.get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
-        h.list->ResourceBarrier(1, &disable_post);
+    }
+    // 1. Configure, once per frame. No swap chain and no callbacks: this
+    //    context only interpolates, the worker's presenter shows the frames.
+    ffxConfigureDescFrameGeneration configure = {};
+    configure.header.type = FFX_API_CONFIGURE_DESC_TYPE_FRAMEGENERATION;
+    configure.swapChain = nullptr;
+    configure.presentCallback = nullptr;
+    configure.frameGenerationCallback = nullptr;
+    configure.frameGenerationEnabled = true;
+    configure.allowAsyncWorkloads = false;
+    configure.flags = FFX_FRAMEGENERATION_FLAG_NO_SWAPCHAIN_CONTEXT_NOTIFY;
+    configure.onlyPresentGenerated = false;
+    configure.generationRect = {0, 0, static_cast<int32_t>(g_fg.w), static_cast<int32_t>(g_fg.height)};
+    configure.frameID = frame_id;
+    // 2. Prepare: the flat depth, the estimated motion (in pixels, so a
+    //    scale of one) and a camera that stands still - there is no engine to
+    //    ask for one.
+    ffxDispatchDescFrameGenerationPrepareV2 prepare = {};
+    prepare.header.type = FFX_API_DISPATCH_DESC_TYPE_FRAMEGENERATION_PREPARE_V2;
+    prepare.frameID = frame_id;
+    prepare.flags = FFX_FRAMEGENERATION_FLAG_NO_SWAPCHAIN_CONTEXT_NOTIFY;
+    prepare.commandList = h.list;
+    prepare.renderSize = {v.w, v.hgt};
+    prepare.jitterOffset = {0.0f, 0.0f};
+    prepare.motionVectorScale = {1.0f, 1.0f};
+    prepare.frameTimeDelta = static_cast<float>(std::clamp(interval, 0.004, 0.1) * 1000.0);
+    prepare.reset = reset;
+    prepare.cameraNear = 0.1f;
+    prepare.cameraFar = 1000.0f;
+    prepare.cameraFovAngleVertical = 1.0f;
+    prepare.viewSpaceToMetersFactor = 1.0f;
+    prepare.depth = ffxApiGetResourceDX12(g_fg.depth.tex, FFX_API_RESOURCE_STATE_COMPUTE_READ);
+    prepare.motionVectors = ffxApiGetResourceDX12(v.mv.tex, FFX_API_RESOURCE_STATE_COMPUTE_READ);
+    prepare.cameraPosition[0] = prepare.cameraPosition[1] = prepare.cameraPosition[2] = 0.0f;
+    prepare.cameraUp[0] = 0.0f; prepare.cameraUp[1] = 1.0f; prepare.cameraUp[2] = 0.0f;
+    prepare.cameraRight[0] = 1.0f; prepare.cameraRight[1] = 0.0f; prepare.cameraRight[2] = 0.0f;
+    prepare.cameraForward[0] = 0.0f; prepare.cameraForward[1] = 0.0f; prepare.cameraForward[2] = 1.0f;
+    // 3. The generation itself: every generated frame of this real one in one
+    //    dispatch.
+    ffxDispatchDescFrameGeneration generate = {};
+    generate.header.type = FFX_API_DISPATCH_DESC_TYPE_FRAMEGENERATION;
+    generate.commandList = h.list;
+    generate.presentColor = ffxApiGetResourceDX12(color, FFX_API_RESOURCE_STATE_COMPUTE_READ);
+    for (unsigned index = 0; index < g_fg_count; ++index)
+        generate.outputs[index] = ffxApiGetResourceDX12(g_fg.output[index].get(), FFX_API_RESOURCE_STATE_UNORDERED_ACCESS);
+    generate.numGeneratedFrames = g_fg_count;
+    generate.reset = reset;
+    generate.backbufferTransferFunction = hdr ? FFX_API_BACKBUFFER_TRANSFER_FUNCTION_PQ
+                                              : FFX_API_BACKBUFFER_TRANSFER_FUNCTION_SRGB;
+    generate.minMaxLuminance[0] = 0.0f; generate.minMaxLuminance[1] = 1000.0f;
+    generate.generationRect = configure.generationRect;
+    generate.frameID = frame_id;
+    ffxReturnCode_t result = FgConfigureGuarded(&g_fg.context, &configure.header);
+    if (g_fg_fault == 0 && result == FFX_API_RETURN_OK)
+        result = FgDispatchGuarded(&g_fg.context, &prepare.header);
+    if (g_fg_fault == 0 && result == FFX_API_RETURN_OK)
+        result = FgDispatchGuarded(&g_fg.context, &generate.header);
+    if (g_fg_fault != 0)
+    {
+        AbortCommands();
+        ReportFailure("fg-evaluate", "seh", static_cast<HRESULT>(g_fg_fault));
+        Log("[fg] Evaluate raised 0x%08X (caught) - Frame Generation off", g_fg_fault);
+        g_fg.failed = true;
+        return false;
+    }
+    for (unsigned index = 0; index < g_fg_count; ++index)
+    {
         auto out_post = Transition(g_fg.output[index].get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
         h.list->ResourceBarrier(1, &out_post);
-        auto post = Transition(color, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, state);
-        if (state != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) h.list->ResourceBarrier(1, &post);
-        if (NVSDK_NGX_FAILED(result))
+    }
+    auto post = Transition(color, D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE, state);
+    if (state != D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE) h.list->ResourceBarrier(1, &post);
+    if (result != FFX_API_RETURN_OK)
+    {
+        if (profile_fg) ProfileGpuEnd(PS_FG);
+        if (!ProfileWait(PS_FG, EndCommands(), 30000, "fg-evaluate"))
+        { g_fg.failed = true; return false; }
+        // A refused multiplier is not a broken feature, and it used to be
+        // treated as one: FG died at every count, including on a provider
+        // that runs 2x perfectly well. Step down; 2x is the floor.
+        // No retry flag here: the create already succeeded, so the next frame
+        // is an ordinary fresh build at the lower step and its own failure
+        // must read as one.
+        if (FgStepDown(result)) { CloseFgResources(); return false; }
+        // 2x itself was refused. Before calling it a card that cannot run
+        // frame generation: the provider that was created may simply be the
+        // wrong one for this GPU (the ML provider needs hardware the card
+        // may not have), and the runtime ships another. Reject this one and
+        // let the next build take the next provider.
+        if (g_fg.provider_id != 0 && !FgProviderRejected(g_fg.provider_id))
         {
-            if (profile_fg) ProfileGpuEnd(PS_FG);
-            if (!ProfileWait(PS_FG, EndCommands(), 30000,
-                                "fg-evaluate"))
-            { g_fg.failed = true; return false; }
-            // A refused multiplier is not a broken feature, and it used to be
-            // treated as one: FG died at every count, including on a card that
-            // runs 2x perfectly well. Step down; 2x is the floor, so a refusal
-            // there does mean Frame Generation cannot run on this GPU. No
-            // retry flag here: the create already succeeded, so the next frame
-            // is an ordinary fresh build at the lower step and its own failure
-            // must read as one.
-            if (FgStepDown(result)) { CloseFgResources(); return false; }
-            Log("[fg] Evaluate failed 0x%08X; falling back", result);
-            g_fg.failed = true; CloseFgResources(); return false;
+            Log("[fg] provider %s refused to dispatch (0x%08X) - trying another one",
+                g_fg_provider_name, static_cast<unsigned>(result));
+            g_fg_rejected_providers.push_back(g_fg.provider_id);
+            g_fg_count = std::min(g_fg_count, kFgMaxGenerated);
+            g_fg_count_limit = kFgMaxGenerated;
+            CloseFgResources();
+            g_fg_retry = true;
+            return false;
         }
+        Log("[fg] Evaluate failed 0x%08X; falling back", static_cast<unsigned>(result));
+        g_fg.failed = true; CloseFgResources(); return false;
     }
     if (profile_fg) ProfileGpuEnd(PS_FG);
     FgSlot *slot = nullptr;
@@ -863,7 +1078,7 @@ static bool FgPresent(VideoState &v, ID3D12Resource *color, D3D12_RESOURCE_STATE
     }
     // Interface protection (v2.6.0): where the client found a still interface
     // over a moving picture - a HUD, subtitles, a score - the generated frames
-    // show the real frame's pixels. DLSS-G warps text with the motion around
+    // show the real frame's pixels. frame generation warps text with the motion around
     // it, and a still label has no motion of its own to follow. Copied before
     // the lens and the badge, so both go on the protected frame as on any.
     if (g_ui_rects.count > 0)
@@ -894,7 +1109,7 @@ static bool FgPresent(VideoState &v, ID3D12Resource *color, D3D12_RESOURCE_STATE
         }
     }
     // The fisheye lens goes on what the presenter shows - the real frame and
-    // each generated one, all resting in COPY_SOURCE - never on what DLSS-G
+    // each generated one, all resting in COPY_SOURCE - never on what FSR
     // interpolated from: its motion field is the rectilinear picture's.
     LensInPlace(h.list, slot->real.get());
     for (unsigned i = 0; i < g_fg_count; ++i) LensInPlace(h.list, slot->interpolated[i].get());
@@ -906,15 +1121,6 @@ static bool FgPresent(VideoState &v, ID3D12Resource *color, D3D12_RESOURCE_STATE
     if (!ProfileWait(PS_FG, fg_fence, 30000, "fg-evaluate"))
     { g_fg.failed = true; CloseFgResources(); return false; }
     g_fg_present_fence = fg_fence;
-    BYTE *disabled = nullptr;
-    D3D12_RANGE read = {0, g_fg_count * 4}, written = {0, 0};
-    if (SUCCEEDED(g_fg.disable_readback->Map(0, &read, reinterpret_cast<void **>(&disabled))))
-    {
-        for (unsigned i = 0; i < g_fg_count; ++i)
-            allow_interpolation = allow_interpolation && disabled[i * 4] == 0;
-        g_fg.disable_readback->Unmap(0, &written);
-    }
-    else allow_interpolation = false;
     FgDump(color, state, 0);
     for (unsigned i = 0; i < g_fg_count; ++i) FgDump(slot->interpolated[i].get(), D3D12_RESOURCE_STATE_COPY_SOURCE, i + 1);
     SpoutBridgeSend();
@@ -946,9 +1152,9 @@ static void ConfigureFgFrame(uint32_t flags)
     const unsigned count = std::min(requested, g_fg_count_limit);
     if (g_fg_ui_enabled == enabled && g_fg_count == count) return;
     CloseFgResources();
-    // A fresh switch-on is a fresh attempt: the ceiling goes back to the DLSS 4.5
+    // A fresh switch-on is a fresh attempt: the ceiling goes back to the 5x
     // maximum and the user's own choice is asked for again. A step this card
-    // refused earlier is worth exactly one retry after a provider or driver
+    // refused earlier is worth exactly one retry after a runtime or driver
     // update, and those do not restart the program.
     if (enabled && g_fg_ui_enabled == 0) g_fg_count_limit = kFgMaxGenerated;
     g_fg_retry = false;

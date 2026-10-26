@@ -154,8 +154,8 @@ def _fg_verdict_checks() -> None:
 
     # A refusal AFTER the enable marker -> off with the alert armed.
     alerts = []
-    logs = ["[fg] UI: on, 2x", "[fg] Init_Ext -> 0xBAD00002",
-            "[fg] CreateFeature failed 0xBAD00002"]
+    logs = ["[fg] UI: on, 2x", "[fg] Init -> 0xBAD00002",
+            "[fg] CreateContext failed 0xBAD00002"]
     st = SimpleNamespace(cfg={"frame_generation": True}, worker_logs=logs,
                          fg_alerted=False,
                          lang="en", display=SimpleNamespace(
@@ -185,7 +185,7 @@ def _fg_verdict_checks() -> None:
     assert st2.fg_alerted is False
 
     # A stale refusal from BEFORE the last "UI: on" must not flip the switch.
-    logs_stale = ["[fg] CreateFeature failed 0xBAD00002", "[fg] UI: off, 2x",
+    logs_stale = ["[fg] CreateContext failed 0xBAD00002", "[fg] UI: off, 2x",
                   "[fg] UI: on, 2x"]
     st3 = SimpleNamespace(cfg={"frame_generation": True}, worker_logs=logs_stale,
                           fg_alerted=False, lang="en",
@@ -195,7 +195,7 @@ def _fg_verdict_checks() -> None:
     # A refused multiplier that STEPPED DOWN and then built (issue #100) must
     # not flip the switch: the card runs Frame Generation, just at 2x.
     logs_step = ["[fg] UI: on, 4x",
-                 "[fg] CreateFeature failed 0xBAD00005",
+                 "[fg] CreateContext failed 0xBAD00005",
                  "[fg] 4x refused 0xBAD00005; stepping down to 2x",
                  "[fg] UI: on, 2x (capped by the runtime ceiling)",
                  "[fg] 2x enabled at 3840x2160, format=28"]
@@ -209,7 +209,7 @@ def _fg_verdict_checks() -> None:
     # A step-down still in flight (no verdict yet) must not flip it either.
     st5 = SimpleNamespace(cfg={"frame_generation": True},
                           worker_logs=["[fg] UI: on, 4x",
-                                       "[fg] CreateFeature failed 0xBAD00005",
+                                       "[fg] CreateContext failed 0xBAD00005",
                                        "[fg] 4x refused 0xBAD00005; stepping down to 2x"],
                           fg_alerted=False, lang="en",
                           display=SimpleNamespace(alert=lambda *a, **k: alerts.append(a)))

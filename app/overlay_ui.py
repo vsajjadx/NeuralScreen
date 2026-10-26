@@ -1459,7 +1459,7 @@ class OverlayMenu:
                 # translation: "off" is three characters in English and eleven
                 # in Spanish ("desactivado"), so three two-character steps were
                 # each given 95 px, the group took 380 of the row's 488, and the
-                # control's own name - "DLSS 4.5 FG", 94 px - was clipped in the
+                # control's own name - "FSR FG", 94 px - was clipped in the
                 # 91 px left over. Measured with the product's fonts: es was the
                 # one that clipped, pt and it cleared it by under 33 px. Per-cell
                 # widths bring the same group down to 227 px in every locale.
@@ -2091,10 +2091,10 @@ class OverlayMenu:
                     "the runtime caps this card at x{live} - FG runs there, "
                     "your x{want} is asked for again on the next attempt"
                 ).format(live=live, want=multiplier)
-            # Named "DLSS 4.5 FG", not "Frame multiplier": five cells leave
+            # Named "FSR FG", not "Frame multiplier": five cells leave
             # 251 px for the caption, and the translated word needs up to 288
             # (es) - test_fg_row_fits measures it in every language.
-            toggle("frame_multiplier", "DLSS 4.5 FG",
+            toggle("frame_multiplier", "FSR FG",
                    fg, hint=fg_hint, segments_only=True,
                    inline_right=[(f"frame_multiplier:{m}", f"×{m}")
                                  for m in range(2, FG_MULTIPLIER_MAX + 1)])

@@ -94,7 +94,7 @@ def main() -> int:
             print("SKIP: Frame Generation did not run here (DLSS-G unavailable)")
             return 0
         failures.append("the FG runtime was never initialised")
-    inits = [ln for ln in lines if "[fg] Init_Ext ->" in ln]
+    inits = [ln for ln in lines if "[fg] Init ->" in ln]
     if len(inits) < 2:
         failures.append(f"Init_Ext ran {len(inits)} time(s): the second switch-on "
                         f"reused a runtime whose initialisation had failed")

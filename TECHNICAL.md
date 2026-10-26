@@ -1043,15 +1043,23 @@ The artifact `native/nvngx.dll` is not committed to the repo.
 
 ## Frame Generation on the desktop (opt-in)
 
-DLSS-G's desktop build runs after the neural pass: the presenter asks the FG
-feature to interpolate between consecutive output frames. The depth fed to it
-is flat and the motion is estimated per frame - there is no engine
-cooperation - so UI and text can distort where motion estimation guesses
-wrong; that is inherent to the screen-space approach, not a tuning issue.
-The multiplier is x2 to x6 (DLSS 4.5's ceiling; a runtime that refuses a
-step is walked down to the one it takes), the switch is
-opt-in, and the header reports both rates - the network's and the presenter's
-- whenever they differ.
+FSR Frame Generation (AMD FidelityFX SDK 2.3, Frame Generation 4.0.1) runs after
+the neural pass: the presenter asks the FSR context to interpolate between
+consecutive output frames. The context is used without FSR's swap chain proxy
+(`FFX_FRAMEGENERATION_FLAG_NO_SWAPCHAIN_CONTEXT_NOTIFY`): per frame the worker
+calls `ffxConfigure`, the prepare dispatch (flat depth, estimated motion in
+pixels, a still camera) and the generation dispatch, into textures the worker
+owns, and its own presenter shows them. There is no engine cooperation, so UI
+and text can distort where motion estimation guesses wrong. The multiplier is
+x2 to x5 (the dispatch carries four outputs); a provider that refuses a step is
+walked down to the one it takes, the switch is opt-in, and the header reports
+both rates - the network's and the presenter's - whenever they differ.
+
+The runtime picks the newest provider for the GPU (the ML one needs an AMD
+Radeon 9000-series card and Windows 11). A provider that cannot be created, or
+that refuses even x2, is set aside and the next one is tried (the legacy
+analytical provider needs only Shader Model 6.2); the log names it
+(`[fg] FSR provider: ...`).
 
 FG is independent of NR: with the neural pass off, the presenter interpolates
 the raw capture instead of the neural frame, so the doubled rate survives
@@ -1074,11 +1082,12 @@ submission: +0.3 ms a frame. With `NS_PHASE=1` the presenter logs its copy and
 vblank waits and how many generated frames were shown, late or superseded
 (`[phase] fg presenter`).
 
-The FG runtime (`nvngx_dlssg.dll`) ships in the archive - the public
-310.9.16.0 redistributable, NVIDIA-signed, included unmodified. The licensing
-position is stated in the README notice: research use, takedown on request.
-Absent the DLL, the switch refuses politely and nothing breaks; a different
-build drops into `native/libraries/`.
+The FG runtime (`amd_fidelityfx_loader_dx12.dll` and
+`amd_fidelityfx_framegeneration_dx12.dll`, FSR SDK 2.3.0) ships in the archive,
+AMD-signed and unmodified; `native\fetch-fsr-runtime.bat` downloads the pinned
+copies for a development tree. Absent the DLLs, the switch refuses politely and
+nothing breaks; a different build drops into `native/libraries/` (AMD signature
+required).
 
 ## Runtimes and the libraries folder
 

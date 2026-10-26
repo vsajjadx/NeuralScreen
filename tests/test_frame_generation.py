@@ -156,8 +156,8 @@ def run(hdr=False, dynamic=False, check_pixels=False, fg_only=False):
         # NR off from the very first frame and FG on: this is the case that had
         # no lifecycle lines at all in a user's log (#104). The presenter must
         # start here, on the bypass path, not only after NR comes back.
-        assert "[fg] Init_Ext -> 0x00000001" in log, \
-            "FG never initialised on the bypass path: no [fg] Init_Ext"
+        assert "[fg] Init -> 0x00000000" in log, \
+            "FG never initialised on the bypass path: no [fg] Init"
         assert re.search(r"\[fg\] \d+x enabled at", log), \
             "the presenter never started: no '[fg] Nx enabled at' on the bypass path"
         assert "[fg] displayed" in log, \
@@ -174,8 +174,8 @@ def run(hdr=False, dynamic=False, check_pixels=False, fg_only=False):
     # the bypass path joined the presenter and rebuilt it afterwards - it was
     # counting the symptom (#104). With the fix the presenter keeps running:
     # the feature is created once and the bypass frames flow through it.
-    assert log.count("[fg] Init_Ext") == 1, \
-        f"the presenter was rebuilt ({log.count('[fg] Init_Ext')} inits): the bypass path still tears it down"
+    assert log.count("[fg] Init") == 1, \
+        f"the presenter was rebuilt ({log.count('[fg] Init')} inits): the bypass path still tears it down"
     assert log.count("[fg] 2x enabled") == 1, \
         f"the presenter was restarted after bypass ({log.count('[fg] 2x enabled')} starts)"
     if dynamic:

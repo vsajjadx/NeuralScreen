@@ -1995,7 +1995,7 @@ def drain_commands(st) -> bool:
                       f"({int(st.cfg.get('frame_multiplier', 2))}x)")
                 st.display.alert(UI_STRINGS[st.lang].get(
                     "fg_on" if state else "fg_off",
-                    "DLSS FG ON" if state else "DLSS FG OFF"))
+                    "FSR FG ON" if state else "FSR FG OFF"))
             elif cmd == "lens":
                 # The camera on/off from the keyboard (#164): the menu
                 # switch's own path - the config, the menu state and the one

@@ -501,11 +501,12 @@ FRAME_FLAG_EARLY_REPLY = 0x2000
 # GPU idle ~2 ms a frame. The worker scores the same gray as it captures and
 # sets the reset itself; the reply brings the score back for the status line.
 FRAME_FLAG_WORKER_SCENE = 0x4000
-# The Frame Generation multiplier, 2 to FG_MULTIPLIER_MAX (#163: DLSS 4.5 goes
-# to 6x on the cards that can). Minus two it rides in bits 9-10 and, for 6x
-# and 5x, in this third bit - 0x800 between them is taken (the explicit-UI
-# flag), and an older worker that reads two bits only falls back below.
-FG_MULTIPLIER_MAX = 6
+# The Frame Generation multiplier, 2 to FG_MULTIPLIER_MAX (FSR frame generation
+# dispatches up to four generated frames per real one: 5x). Minus two it rides
+# in bits 9-10; the third bit below is no longer used by the client (it carried
+# 5x and 6x for DLSS-G) but the worker still reads it - 0x800 between them is
+# taken (the explicit-UI flag).
+FG_MULTIPLIER_MAX = 5
 FRAME_FLAG_FG_MULT_HIGH = 0x8000
 
 # MOTS: the motion field arrives at the optical-flow resolution (~320x180) and

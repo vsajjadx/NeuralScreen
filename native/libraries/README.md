@@ -3,9 +3,11 @@
 Place your own NVIDIA runtime DLLs here; they win over the bundled copies
 in the parent (`native/`) directory. Files are loaded by exact name:
 
-- `nvngx_dlssg.dll` - DLSS Frame Generation (Settings -> Processing ->
-  DLSS Frame Generation). Without it the FG switch reports
-  "nvngx_dlssg.dll load failed" and stays off.
+- `amd_fidelityfx_loader_dx12.dll` + `amd_fidelityfx_framegeneration_dx12.dll` -
+  FSR Frame Generation (Settings -> Processing -> FSR Frame Generation). Both
+  must be AMD-signed and come from the same FidelityFX SDK release. Without
+  them the FG switch reports "amd_fidelityfx_loader_dx12.dll load failed" and
+  stays off. Fetch them with `native\fetch-fsr-runtime.bat`.
 - `nvngx_dlssnr.dll` - the Neural Rendering runtime. Override also
   possible via the `nr_dll` config key (path) or the `NS_NR_DLL`
   environment variable - those take priority over this folder.
@@ -25,9 +27,10 @@ downloads anything on its own; it stays fully offline.
 приоритет над копиями в родительской (`native/`). Загрузка идёт по
 точному имени файла:
 
-- `nvngx_dlssg.dll` - DLSS Frame Generation (Настройки -> Обработка ->
-  DLSS Frame Generation). Без него переключатель сообщит
-  "nvngx_dlssg.dll load failed" и останется выключенным.
+- `amd_fidelityfx_loader_dx12.dll` + `amd_fidelityfx_framegeneration_dx12.dll` -
+  FSR Frame Generation (Настройки -> Обработка -> FSR Frame Generation). Оба
+  файла должны быть подписаны AMD. Без них переключатель сообщит
+  "amd_fidelityfx_loader_dx12.dll load failed" и останется выключенным.
 - `nvngx_dlssnr.dll` - рантайм нейрорендеринга. Альтернативный
   переопределитель - ключ `nr_dll` в config.json (путь) или переменная
   окружения `NS_NR_DLL` - они имеют приоритет над этой папкой.
