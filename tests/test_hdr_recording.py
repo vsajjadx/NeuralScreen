@@ -1,7 +1,7 @@
 """HDR10 recording through a real worker: the file holds what the display gets.
 
 With HDR on, the worker composes each frame in FP16 scRGB (or 10-bit PQ for
-DLSS-G) and used to hand the recorder its SDR proxy - an HDR session recorded
+Frame Generation) and used to hand the recorder its SDR proxy - an HDR session recorded
 as SDR. Now an HDR10 recording takes the composite itself as 10-bit PQ
 BT.2020: with Frame Generation the composite already is that; without it,
 the same composite is dispatched a second time with the PQ encode on. The

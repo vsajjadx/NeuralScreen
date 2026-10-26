@@ -3,7 +3,7 @@
 A user turned Neural Rendering off and left Frame Generation on. The switch
 reached the worker (`[fg] UI: on, 2x` is printed by the worker itself) and the
 frame counter kept climbing, but not one line of the presenter's life ever
-appeared: no `[fg] Init_Ext`, no `[fg] 2x enabled at`, no `[fg] displayed`.
+appeared: no `[fg] Init`, no `[fg] 2x enabled at`, no `[fg] displayed`.
 The package is unambiguous - 3 `[fg]` lines, all three the switch state, 0
 lifecycle lines, and 0 failure lines as well: it did not try and fail, it
 never started.
@@ -37,7 +37,7 @@ flag from the mask, or hardcode `v.output`, and the matching check goes red.
 
 The HDR presenter carries the same `&& !bypass` term; it is closed by its own
 change, and the honest verification of both needs a GPU (a whole session with
-NR off and FG on, asserting `[fg] Init_Ext` and `[fg] displayed` appear) - that
+NR off and FG on, asserting `[fg] Init` and `[fg] displayed` appear) - that
 end-to-end check lives in test_frame_generation.py.
 
 Run:  runtime\\python.exe tests\\test_fg_bypass_present.py
@@ -127,7 +127,7 @@ def main() -> int:
         if "FgPresent(" not in bypass:
             failures.append("PresentBypass() never calls FgPresent(): the "
                             "presenter is not started on the bypass path, so "
-                            "no '[fg] Init_Ext' can ever be logged there")
+                            "no '[fg] Init' can ever be logged there")
         # A gate is what makes the call reachable; an unconditional stop before
         # it means the presenter is torn down and history is cleared per frame.
         if asked >= 0 and stopped >= 0 and stopped < asked:

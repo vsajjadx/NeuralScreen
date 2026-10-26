@@ -30,6 +30,13 @@ Scope and honesty notes:
 
 ---
 
+## Unreleased - Frame Generation moves from DLSS-G to AMD FSR
+
+* The desktop Frame Generation runs on AMD FSR (FidelityFX SDK 2.3, Frame
+  Generation 4.0.1) instead of NVIDIA DLSS-G. DLSS-G and its headers are removed.
+  The multiplier is x2-x5 (FSR dispatches four generated frames at most). The
+  newest provider is used where the GPU has it; otherwise the analytical one.
+
 ## v2.6.3 - 2026-10-21 - The panel opens at start with NR left off
 
 * **With NR left off, the panel still opens at start (#166).** "Open the panel

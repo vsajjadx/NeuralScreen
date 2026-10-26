@@ -501,11 +501,14 @@ FRAME_FLAG_EARLY_REPLY = 0x2000
 # GPU idle ~2 ms a frame. The worker scores the same gray as it captures and
 # sets the reset itself; the reply brings the score back for the status line.
 FRAME_FLAG_WORKER_SCENE = 0x4000
-# The Frame Generation multiplier, 2 to FG_MULTIPLIER_MAX (#163: DLSS 4.5 goes
-# to 6x on the cards that can). Minus two it rides in bits 9-10 and, for 6x
-# and 5x, in this third bit - 0x800 between them is taken (the explicit-UI
-# flag), and an older worker that reads two bits only falls back below.
-FG_MULTIPLIER_MAX = 6
+# The Frame Generation multiplier, 2 to FG_MULTIPLIER_MAX. FSR frame generation
+# makes ONE frame between two real ones (2x): the dispatch description has four
+# output slots, but the providers in SDK 2.3 (3.1.6 analytical, 4.0.x ML) write
+# only outputs[0] and never refuse a higher count, so 3x-5x would present
+# unwritten frames. Raise this only when AMD ships a provider that fills more.
+# Minus two the multiplier rides in bits 9-10; 0x800 between them is taken (the
+# explicit-UI flag).
+FG_MULTIPLIER_MAX = 2
 FRAME_FLAG_FG_MULT_HIGH = 0x8000
 
 # MOTS: the motion field arrives at the optical-flow resolution (~320x180) and

@@ -1411,10 +1411,11 @@ def refresh_gpu_ok(st) -> None:
 
 
 # FG's own refusal lines, the same shape as NR's: the worker says what the
-# runtime answered. Init_Ext logs its HRESULT on every attempt, so success
-# must be excluded by VALUE (NVSDK_NGX_Result_Success is 0x00000001).
-FG_VERDICT_FAIL = ("[fg] CreateFeature failed",
-                   "[fg] nvngx_dlssg.dll load failed",
+# runtime answered. Init logs its return code on every attempt, so success
+# must be excluded by VALUE (FFX_API_RETURN_OK is 0x00000000).
+FG_VERDICT_FAIL = ("[fg] CreateContext failed",
+                   "[fg] amd_fidelityfx_loader_dx12.dll load failed",
+                   "[fg] amd_fidelityfx_framegeneration_dx12.dll load failed",
                    "[fg] presenter failed")
 
 
@@ -1428,7 +1429,7 @@ def fg_verdict(lines):
 
     A REFUSED MULTIPLIER is not a refusal of the feature. The worker steps
     the multiplier down and rebuilds at the lower step (2x is the floor), so
-    the "Nx refused ... stepping down" and "CreateFeature failed" lines that
+    the "Nx refused ... stepping down" and "CreateContext failed" lines that
     precede a working build must not turn the switch off - the switch would
     go dark on a card that runs Frame Generation perfectly well. The worker
     logs "stepping down" exactly for that case, and the step it lands on
@@ -1443,7 +1444,7 @@ def fg_verdict(lines):
             return True            # "[fg] 2x enabled at 3840x2160"
         if "stepping down to" in line:
             return None            # a retry is in flight, not a verdict
-        if "[fg] Init_Ext -> 0x" in line and "0x00000001" not in line:
+        if "[fg] Init -> 0x" in line and "0x00000000" not in line:
             return False           # the FG runtime itself refused
         if any(token in line for token in FG_VERDICT_FAIL):
             return False

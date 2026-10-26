@@ -1,16 +1,16 @@
 r"""A fault inside NVIDIA's Frame Generation runtime does not end the worker.
 
 The neural renderer's create and evaluate have always run under an SEH guard:
-an old driver faults inside NVIDIA's runtime instead of refusing (#51, #83,
+an old driver faults inside the vendor's runtime instead of refusing (#51, #83,
 #145), and the guard turns that into a failure line and a clean "unsupported".
-DLSS-G's create and evaluate had no guard, so the same fault with Frame
+The frame generation create and evaluate had no guard, so the same fault with Frame
 Generation on took the whole worker down - no failure line, a restart, and
 the same again on the next frame with FG (pre-release audit).
 
 Checked on the worker, once per call: a fault is raised inside the guarded
 create (NS_TEST_FAIL_STAGE=fg-create-fault) and inside the guarded evaluate
 (fg-evaluate-fault) with FG on. The worker must catch it, say so, turn FG off
-and keep answering every frame. Nothing shows. Needs an RTX GPU with DLSS-G.
+and keep answering every frame. Nothing shows. Needs a GPU with the FidelityFX runtime.
 
 Run:  runtime\python.exe tests\test_fg_fault.py
 """
@@ -74,7 +74,7 @@ def _run(stage: str, failures: list) -> None:
     text = "\n".join(logs)
     if f"injecting failure at stage={stage}" not in text:
         if "[fg]" in text and "load failed" in text and not failures:
-            print(f"SKIP: Frame Generation did not run here (DLSS-G unavailable)")
+            print(f"SKIP: Frame Generation did not run here (FidelityFX runtime unavailable)")
             return
         failures.append(f"{stage}: the fault was never raised")
     elif "(caught)" not in text:
@@ -98,7 +98,7 @@ def main() -> int:
         print("FAIL:", f)
     if failures:
         return 1
-    print("OK: a fault inside DLSS-G is caught, FG goes off, and the worker "
+    print("OK: a fault inside the FSR runtime is caught, FG goes off, and the worker "
           "keeps answering")
     return 0
 

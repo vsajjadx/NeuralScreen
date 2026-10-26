@@ -12,7 +12,7 @@ toggle - for seconds.
 Checked on the worker with FG 2x: the target is minimised for 2 s while
 frames keep coming; no waitable timeout may be logged, and closing the
 picture window (WNDO off, which stops the presenter) must be answered
-promptly. Nothing shows. Needs an RTX GPU with DLSS-G.
+promptly. Nothing shows. Needs a GPU with the FidelityFX runtime.
 
 Run:  runtime\python.exe tests\test_fg_hidden_target.py
 """
@@ -99,7 +99,7 @@ def main() -> int:
     if not any("[fg]" in ln and "enabled at" in ln for ln in lines):
         unavailable = any(("[fg]" in ln and "load failed" in ln) for ln in lines)
         if unavailable and not failures:
-            print("SKIP: Frame Generation did not run here (DLSS-G unavailable)")
+            print("SKIP: Frame Generation did not run here (FidelityFX runtime unavailable)")
             return 0
         failures.append("Frame Generation never started")
     timeouts = [ln for ln in hidden_lines if "waitable timeout" in ln]

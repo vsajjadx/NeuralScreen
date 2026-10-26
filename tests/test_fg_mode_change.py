@@ -12,7 +12,7 @@ Checked on the worker with FG 2x: the presenter is made to meet one mode
 change (NS_TEST_FAIL_STAGE=fg-mode-changed), and then the window must be
 built again, FG must keep displaying after it, and the change must be said
 once, not per present. Nothing shows: the overlay is far off every monitor
-and the target is a ghost. Needs an RTX GPU with DLSS-G.
+and the target is a ghost. Needs a GPU with the FidelityFX runtime.
 
 Run:  runtime\python.exe tests\test_fg_mode_change.py
 """
@@ -130,12 +130,12 @@ def main() -> int:
 
     lines = list(logs)
     if not any("injecting failure at stage=fg-mode-changed" in ln for ln in lines):
-        # SKIP only on the worker's own word that DLSS-G is not available here,
+        # SKIP only on the worker's own word that the FSR runtime is not available here,
         # and never over a failure already collected.
-        unavailable = any(("[fg]" in ln and ("load failed" in ln or "CreateFeature failed" in ln
+        unavailable = any(("[fg]" in ln and ("load failed" in ln or "CreateContext failed" in ln
                                              or "BYO refused" in ln)) for ln in lines)
         if unavailable and not failures:
-            print("SKIP: Frame Generation did not run here (DLSS-G unavailable)")
+            print("SKIP: Frame Generation did not run here (FidelityFX runtime unavailable)")
             return 0
         failures.append("the presenter never met the injected mode change")
     said = [i for i, ln in enumerate(lines) if "mode change" in ln and "[fg]" in ln]
