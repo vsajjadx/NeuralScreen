@@ -32,6 +32,26 @@ jobs:
       - name: Fetch the AMD FSR runtime
         shell: cmd
         run: call native\fetch-fsr-runtime.bat
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Frame generation tests (no GPU)
+        shell: bash
+        env:
+          SDL_VIDEODRIVER: dummy
+          SDL_AUDIODRIVER: dummy
+        run: |
+          python -m pip install numpy pygame opencv-python-headless pillow av comtypes pystray
+          rc=0
+          for t in test_fg_multiplier_stepdown test_framegen_controls test_fg_row_fits test_fg_bypass_present test_i18n_translated; do
+            echo "== $t"
+            if ! python tests/$t.py > "$t.out" 2>&1; then
+              rc=1
+              msg=$(tail -n 3 "$t.out" | tr '\n' '|' | cut -c1-900)
+              echo "::error title=$t failed::$msg"
+            fi
+          done
+          exit $rc
       # A build script that "succeeds" without producing its file must not pass.
       - name: Verify every native output exists
         shell: pwsh
