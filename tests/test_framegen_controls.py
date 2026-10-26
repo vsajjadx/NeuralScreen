@@ -113,12 +113,12 @@ def main():
     worker = SimpleNamespace(stdin=io.BytesIO())
     protocol.send_frame(worker, 9, None, np.zeros((2, 2, 2), np.float16), False, 0,
                         no_color=True, split=.5, prepared=True,
-                        frame_generation=True, frame_multiplier=4)
+                        frame_generation=True, frame_multiplier=2)
     flags = struct.unpack(protocol.FRAME_FMT, worker.stdin.getvalue()[:24])[3]
     assert flags & 0x1000 == 0x1000, "prepared rides the header"
     assert flags & 0x4000 == 0 and flags & 0x2000 == 0, "the removed SR flags stay unset"
     assert flags >> 16 == 32768
-    assert ((flags >> 9) & 3) == 2
+    assert ((flags >> 9) & 3) == 0, "2x is step 0 of the header's multiplier field"
     # The resolution slider stays Boost-only: no SR to keep it company.
     menu.set_state({"nr_small": False, "work_scale": .8})
     paint(menu)

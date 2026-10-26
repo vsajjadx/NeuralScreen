@@ -114,7 +114,7 @@ def main() -> int:
         with tempfile.TemporaryDirectory(prefix="ns-compile-") as scratch:
             out_obj = Path(scratch) / "nvngx_fg_step.obj"
             command = (f'"{vcvars}" >nul && cl /nologo /c /O2 /EHsc /W3 /MD '
-                       f'/std:c++17 /Iinclude /Isrc "{host}" /Fo:"{out_obj}"')
+                       f'/std:c++17 /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS /Iinclude /Isrc "{host}" /Fo:"{out_obj}"')
             result = subprocess.run(
                 'cmd /d /s /c "' + command + '"', cwd=str(ROOT / "native"),
                 capture_output=True, text=True, encoding="cp866",
