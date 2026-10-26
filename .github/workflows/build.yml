@@ -39,7 +39,7 @@ jobs:
             echo "== $t"
             if ! python tests/$t.py > "$t.out" 2>&1; then
               rc=1
-              msg=$(tail -n 8 "$t.out" | tr '\n' '|' | cut -c1-900)
+              msg=$(tail -n 3 "$t.out" | tr '\n' '|' | cut -c1-900)
               echo "::error title=$t failed::$msg"
             fi
           done

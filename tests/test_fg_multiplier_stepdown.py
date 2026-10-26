@@ -125,16 +125,18 @@ def main() -> int:
         with tempfile.TemporaryDirectory(prefix="ns-compile-") as scratch:
             out_obj = Path(scratch) / "nvngx_fg_step.obj"
             command = (f'"{vcvars}" >nul && cl /nologo /c /O2 /EHsc /W3 /MD '
-                       f'/std:c++17 /Iinclude /Isrc "{host}" /Fo:"{out_obj}"')
+                       f'/std:c++17 /D_SILENCE_EXPERIMENTAL_COROUTINE_DEPRECATION_WARNINGS '
+                       f'/Iinclude /Isrc "{host}" /Fo:"{out_obj}"')
             result = subprocess.run(
                 'cmd /d /s /c "' + command + '"', cwd=str(ROOT / "native"),
                 capture_output=True, text=True, encoding="cp866",
                 errors="replace", timeout=540)
             combined = (result.stdout or "") + (result.stderr or "")
             if result.returncode != 0 or "error C" in combined:
+                errors = "\n".join(l for l in combined.splitlines()
+                                   if "error" in l.lower())[:500]
                 failures.append("the worker does not compile:\n" +
-                                "\n".join(l for l in combined.splitlines()
-                                          if "error" in l.lower())[:500])
+                                (errors or combined[-500:]))
 
     for f in failures:
         print("FAIL:", f)
