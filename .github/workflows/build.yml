@@ -50,6 +50,24 @@ jobs:
           $missing = $need | Where-Object { -not (Test-Path $_) }
           if ($missing) { Write-Error ('missing native outputs: ' + ($missing -join ', ')); exit 1 }
           $need | ForEach-Object { '{0,12:N0}  {1}' -f (Get-Item $_).Length, $_ }
+      # The update package: every tracked file (app, main.py, native sources,
+      # config, docs) with the built binaries laid over it. Extract it over an
+      # existing install; runtime\ (embedded Python) and nvngx_dlssnr.dll are
+      # not in the repository and stay as the install has them.
+      - name: Assemble the update package
+        shell: pwsh
+        run: |
+          git archive --format=zip --prefix=NeuralScreen/ -o ns-src.zip HEAD
+          Expand-Archive ns-src.zip -DestinationPath pkg
+          Copy-Item native/*.dll, native/*.exe pkg/NeuralScreen/native/ -Force
+          Copy-Item NeuralScreen.exe pkg/NeuralScreen/ -Force
+          Compress-Archive -Path pkg/NeuralScreen -DestinationPath neuralscreen-update.zip
+          '{0:N0} bytes' -f (Get-Item neuralscreen-update.zip).Length
+      - uses: actions/upload-artifact@v4
+        with:
+          name: neuralscreen-update-package
+          if-no-files-found: error
+          path: neuralscreen-update.zip
       - uses: actions/upload-artifact@v4
         with:
           name: neuralscreen-native
