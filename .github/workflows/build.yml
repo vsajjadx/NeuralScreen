@@ -19,17 +19,24 @@ jobs:
       - name: Launcher (NeuralScreen.exe)
         shell: cmd
         run: call native\build-launcher.bat
+      - name: Verify the build outputs exist
+        shell: bash
+        run: |
+          for f in native/nvngx.dll native/nvngx.dll_ns-forwarder.dll NeuralScreen.exe \
+                   native/amd_fidelityfx_loader_dx12.dll native/amd_fidelityfx_framegeneration_dx12.dll; do
+            test -s "$f" || { echo "MISSING: $f"; exit 1; }
+            ls -l "$f"
+          done
       - name: Python tests (no GPU)
-        shell: cmd
+        shell: bash
         env:
           SDL_VIDEODRIVER: dummy
           SDL_AUDIODRIVER: dummy
         run: |
           python -m pip install numpy pygame
-          python tests\test_fg_multiplier_stepdown.py
-          python tests\test_framegen_controls.py
-          python tests\test_fg_row_fits.py
-          python tests\test_i18n_translated.py
+          for t in test_fg_multiplier_stepdown test_framegen_controls test_fg_row_fits test_i18n_translated; do
+            echo "== $t"; python tests/$t.py
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: neuralscreen-build
