@@ -35,6 +35,7 @@
 #define WIN32_LEAN_AND_MEAN
 #endif
 #include <windows.h>
+#include <string.h>
 #include <softpub.h>
 #include <wincrypt.h>
 #include <wintrust.h>
@@ -43,13 +44,17 @@
 #pragma comment(lib, "crypt32.lib")
 #pragma comment(lib, "version.lib")
 
-// The one signer the BYO folder accepts: NVIDIA signs its runtimes directly.
+// The signers the BYO folder accepts: NVIDIA signs its runtimes directly, and
+// AMD signs the FidelityFX loader and effect DLLs (frame generation) the same
+// way. The DLL's own name picks the pair; there is no way to mix them.
 static const wchar_t *kTrustedSignerCn = L"NVIDIA Corporation";
+static const wchar_t *kTrustedSignerCnAmd = L"Advanced Micro Devices, Inc.";
 
 // The product-name prefix the version resource carries ("NVIDIA DLSS-G",
 // "NVIDIA NGX", and friends - pinning a marketing name would break on a
 // rename).
 static const wchar_t *kTrustedProductPrefix = L"NVIDIA";
+static const wchar_t *kTrustedProductPrefixAmd = L"AMD";
 
 // Handles kept open until the process exits, so the verified bytes are the
 // bytes LoadLibrary maps.
@@ -149,10 +154,13 @@ static PCCERT_CONTEXT NsLeafCertificate(const wchar_t *path,
 }
 
 // Verify a DLL's Authenticode signature end to end: valid chain to a
-// machine root, NVIDIA signer, NVIDIA product name. True = loadable.
-static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold);
+// machine root, the expected signer (NVIDIA or AMD) and product name.
+// True = loadable.
+static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold,
+                             const wchar_t *signer, const wchar_t *product);
 
-static bool NsTrustedDll(const wchar_t *path)
+static bool NsTrustedDll(const wchar_t *path, const wchar_t *signer = kTrustedSignerCn,
+                         const wchar_t *product = kTrustedProductPrefix)
 {
     // ---- the anti-swap hold, first -------------------------------------
     if (g_trusted_file_count >= (int)(sizeof(g_trusted_file_handles)
@@ -162,7 +170,7 @@ static bool NsTrustedDll(const wchar_t *path)
                               nullptr, OPEN_EXISTING,
                               FILE_ATTRIBUTE_NORMAL, nullptr);
     if (hold == INVALID_HANDLE_VALUE) return false;
-    if (!NsTrustedDllHeld(path, hold)) { CloseHandle(hold); return false; }
+    if (!NsTrustedDllHeld(path, hold, signer, product)) { CloseHandle(hold); return false; }
     g_trusted_file_handles[g_trusted_file_count++] = hold;
     return true;
 }
@@ -170,7 +178,8 @@ static bool NsTrustedDll(const wchar_t *path)
 // The checks, with the file already held open. The signature is verified
 // through that very handle; the other reads go by path, which the hold keeps
 // pointing at the same bytes.
-static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold)
+static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold,
+                             const wchar_t *signer_cn, const wchar_t *product_prefix)
 {
     // ---- Authenticode -------------------------------------------------
     WINTRUST_FILE_INFO file = {};
@@ -232,7 +241,7 @@ static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold)
             {
                 if (CertGetNameStringW(leaf, CERT_NAME_SIMPLE_DISPLAY_TYPE,
                                        0, nullptr, name, len) > 0
-                    && wcscmp(name, kTrustedSignerCn) == 0)
+                    && wcscmp(name, signer_cn) == 0)
                     signer_ok = true;
                 HeapFree(GetProcessHeap(), 0, name);
             }
@@ -270,8 +279,8 @@ static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold)
             UINT plen = 0;
             if (VerQueryValueW(block, query, (void **)&product, &plen)
                 && product && plen > 0
-                && wcsncmp(product, kTrustedProductPrefix,
-                           wcslen(kTrustedProductPrefix)) == 0)
+                && wcsncmp(product, product_prefix,
+                           wcslen(product_prefix)) == 0)
                 product_ok = true;
         }
     }
@@ -285,5 +294,7 @@ static bool NsTrustedDllHeld(const wchar_t *path, HANDLE hold)
 // so it must not log itself); a DLL is never modified here - only refused.
 static bool NsGateByoDll(const wchar_t *path, const char *what)
 {
+    if (what != nullptr && strncmp(what, "amd_fidelityfx", 14) == 0)
+        return NsTrustedDll(path, kTrustedSignerCnAmd, kTrustedProductPrefixAmd);
     return NsTrustedDll(path);
 }

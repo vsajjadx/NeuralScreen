@@ -6,10 +6,8 @@ the components remain controlling.
 
 ## NVIDIA components
 
-The package currently contains two different classes of NVIDIA software:
+The package currently contains one NVIDIA runtime:
 
-- `nvngx_dlssg.dll` 310.9.16.0 is an NVIDIA-signed public DLSS-G
-  redistributable and remains subject to NVIDIA's applicable terms.
 - `nvngx_dlssnr.dll` 310.8.0 is a leaked, non-public DLSS-NR build. The project
   has not documented a grant that permits redistributing this file. Its
   presence in an archive, an attribution notice, or a research-only label does
@@ -18,6 +16,21 @@ The package currently contains two different classes of NVIDIA software:
 NGX headers and import libraries remain subject to their SDK terms. All NVIDIA
 files remain NVIDIA property. NeuralScreen is independent and is not affiliated
 with or endorsed by NVIDIA.
+
+## AMD FidelityFX (FSR Frame Generation)
+
+Frame Generation uses AMD FidelityFX SDK 2.3.0 (FSR Frame Generation 4.0.1):
+
+- `native/amd_fidelityfx_loader_dx12.dll` 2.3.0.2740 and
+  `native/amd_fidelityfx_framegeneration_dx12.dll` 4.0.1.2740 are AMD-signed
+  binaries, redistributed unmodified and in binary form only, under the AMD
+  redistribution license reproduced in `native/AMD-FidelityFX-LICENSE.md`
+  (no reverse engineering, notices must be reproduced).
+- The API headers under `native/include/ffx/` are from the same SDK and carry
+  AMD's MIT notice in each file.
+
+Copyright (C) Advanced Micro Devices, Inc. NeuralScreen is independent and is
+not affiliated with or endorsed by AMD.
 
 ## Spout2
 

@@ -1411,10 +1411,10 @@ def refresh_gpu_ok(st) -> None:
 
 
 # FG's own refusal lines, the same shape as NR's: the worker says what the
-# runtime answered. Init_Ext logs its HRESULT on every attempt, so success
-# must be excluded by VALUE (NVSDK_NGX_Result_Success is 0x00000001).
-FG_VERDICT_FAIL = ("[fg] CreateFeature failed",
-                   "[fg] nvngx_dlssg.dll load failed",
+# runtime answered. The loader logs "ready" on success and the create logs
+# its return code only when it fails, so a plain success never matches.
+FG_VERDICT_FAIL = ("[fg] ffxCreateContext failed",
+                   "[fg] amd_fidelityfx_loader_dx12.dll load failed",
                    "[fg] presenter failed")
 
 

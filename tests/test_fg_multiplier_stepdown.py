@@ -1,6 +1,6 @@
 """A refused multiplier steps down; it must not kill Frame Generation (issue #100).
 
-A card whose DLSS-G runtime stops at 2x answered a request for 3x/4x with a
+A card whose FSR Frame Generation runtime stops at 2x answered a request for 3x/4x with a
 refusal. The worker treated that refusal as "Frame Generation does not work on
 this GPU": it set g_fg.failed, released everything, and every later frame went
 through the ordinary present path. The switch on the panel stayed on (or, with
@@ -9,9 +9,9 @@ run 2x perfectly well - the multiplier is a preference, not a capability.
 
 Checked here:
 
-* the ceiling is read from what the runtime itself reports
-  (DLSSG.MultiFrameCountMax), so a 2x card is never asked for 4x in the first
-  place;
+* the FidelityFX API has no capability query for the multiplier, so the
+  request is made at the 5x ceiling and what adapts is the step-down, driven
+  by an answer the runtime really gave;
 * a refused create OR evaluation steps the multiplier down instead of failing
   the feature, and 2x is the floor - a refusal there is a real refusal;
 * the request is clamped to the ceiling, so the step that already failed is
@@ -40,15 +40,13 @@ def main() -> int:
         print("FAIL: the frame generation source is not readable")
         return 1
 
-    # --- the cap the runtime reports -------------------------------------
-    if "NVSDK_NGX_DLSSG_Parameter_MultiFrameCountMax" not in src:
-        failures.append("the worker never asks the runtime for its multiplier "
-                        "ceiling - a log from a 2x card does not name the reason")
-    if "NVSDK_NGX_D3D12_GetCapabilityParameters" not in src:
-        failures.append("the capability query is gone: the ceiling cannot be "
-                        "read from the runtime")
-    if "g_fg_cap_reported" not in src:
-        failures.append("the reported ceiling is not kept anywhere")
+    # --- the ceiling -----------------------------------------------------
+    if not re.search(r"kFgMaxGenerated\s*=\s*4\s*;", src):
+        failures.append("the ceiling is not the four outputs one FSR Frame "
+                        "Generation dispatch takes (outputs[4])")
+    if "NVSDK_NGX" in src or "NGX_D3D12" in src:
+        failures.append("the frame generation source still reaches for NGX: "
+                        "the backend is FSR Frame Generation now")
     # Report-only: an unverified capability answer must not clamp a request
     # that would otherwise have worked.
     if re.search(r"g_fg_count_limit\s*=\s*std::min\(g_fg_count_limit", src):
@@ -67,12 +65,12 @@ def main() -> int:
     # the count up front) and the evaluation (one that refuses per frame).
     # The create runs under an SEH guard now (FgCreateGuarded); its result is
     # judged after the fault check, before the depth texture is built.
-    create = re.search(r"const auto result = FgCreateGuarded\((.*?)CreateVideoTex\(g_fg\.depth",
+    create = re.search(r"ffxReturnCode_t result = FgCreateGuarded\((.*?)CreateVideoTex\(g_fg\.depth",
                        src, re.S)
     if not create or "FgStepDown(result)" not in create.group(1):
         failures.append("a refused CreateFeature does not step down")
-    evaluate = re.search(r"if \(NVSDK_NGX_FAILED\(result\)\)\s*\n\s*\{"
-                         r"(.*?)\n        \}", src, re.S)
+    evaluate = re.search(r"if \(result != FFX_API_RETURN_OK\)\s*\n\s*\{"
+                         r"(.*?)\n    \}", src, re.S)
     if not evaluate or "FgStepDown(result)" not in evaluate.group(1):
         failures.append("a refused evaluation does not step down")
 

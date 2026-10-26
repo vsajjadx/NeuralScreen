@@ -1,17 +1,20 @@
 # Libraries (BYO - bring your own)
 
-Place your own NVIDIA runtime DLLs here; they win over the bundled copies
+Place your own NVIDIA / AMD runtime DLLs here; they win over the bundled copies
 in the parent (`native/`) directory. Files are loaded by exact name:
 
-- `nvngx_dlssg.dll` - DLSS Frame Generation (Settings -> Processing ->
-  DLSS Frame Generation). Without it the FG switch reports
-  "nvngx_dlssg.dll load failed" and stays off.
+- `amd_fidelityfx_loader_dx12.dll` + `amd_fidelityfx_framegeneration_dx12.dll` -
+  FSR Frame Generation (Settings -> Processing -> FSR Frame Generation). Both
+  must be here together and AMD-signed; otherwise the bundled copies in
+  `native/` are used. Without any, the FG switch reports
+  "amd_fidelityfx_loader_dx12.dll load failed" and stays off.
 - `nvngx_dlssnr.dll` - the Neural Rendering runtime. Override also
   possible via the `nr_dll` config key (path) or the `NS_NR_DLL`
   environment variable - those take priority over this folder.
 
-Where to get DLLs: DLSS Swapper, or the official NVIDIA/DLSS GitHub
-repository (`lib/Windows_x86_64/rel/`). Match the DLL's architecture
+Where to get DLLs: DLSS Swapper, the official NVIDIA/DLSS GitHub
+repository (`lib/Windows_x86_64/rel/`), or the AMD FidelityFX SDK release
+(GPUOpen-LibrariesAndSDKs/FidelityFX-SDK). Match the DLL's architecture
 requirements - the app reports supported kernels at startup.
 
 Removed with the library auto-updater (2026-09-14): the app no longer
@@ -25,9 +28,11 @@ downloads anything on its own; it stays fully offline.
 приоритет над копиями в родительской (`native/`). Загрузка идёт по
 точному имени файла:
 
-- `nvngx_dlssg.dll` - DLSS Frame Generation (Настройки -> Обработка ->
-  DLSS Frame Generation). Без него переключатель сообщит
-  "nvngx_dlssg.dll load failed" и останется выключенным.
+- `amd_fidelityfx_loader_dx12.dll` + `amd_fidelityfx_framegeneration_dx12.dll` -
+  FSR Frame Generation (Настройки -> Обработка -> FSR Frame Generation). Обе
+  должны лежать здесь вместе и быть подписаны AMD; иначе берутся копии из
+  `native/`. Без них переключатель сообщит
+  "amd_fidelityfx_loader_dx12.dll load failed" и останется выключенным.
 - `nvngx_dlssnr.dll` - рантайм нейрорендеринга. Альтернативный
   переопределитель - ключ `nr_dll` в config.json (путь) или переменная
   окружения `NS_NR_DLL` - они имеют приоритет над этой папкой.

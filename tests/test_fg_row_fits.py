@@ -40,7 +40,7 @@ import pygame  # noqa: E402
 
 import protocol  # noqa: E402
 
-FG_LABEL = "DLSS 4.5 FG"
+FG_LABEL = "FSR FG"
 #: The state square the PROCESSING section puts before every caption, plus its
 #: gap - the caption starts that far right of the row.
 SQUARE_SHIFT = 7 + 10
@@ -104,7 +104,7 @@ def main() -> int:
                  if it.kind == "button"
                  and str(it.key).startswith(("frame_multiplier:",
                                              "frame_generation:"))]
-        want_cells = protocol.FG_MULTIPLIER_MAX - 1   # x2 .. x6 (#163, v2.6.0)
+        want_cells = protocol.FG_MULTIPLIER_MAX - 1   # x2 .. x5
         if len(cells) != want_cells:
             failures.append(
                 f"the FG row has {len(cells)} cells, expected {want_cells} "

@@ -937,7 +937,7 @@ centre stays sharp.
 
 **Where it runs.** After the network, after the HDR composite and after
 Frame Generation - never on the network's input, the motion field or the
-frames DLSS-G interpolates from (its motion is rectilinear). Every export site
+frames FSR FG interpolates from (its motion is rectilinear). Every export site
 - the SDR, bypass and HDR presents, each real and generated frame of the FG
 presenter, the Spout/GPU-recording copy and the pixel readback (screenshots,
 CPU recording) - hands its source to `LensApply`, which writes into a target
@@ -1043,13 +1043,19 @@ The artifact `native/nvngx.dll` is not committed to the repo.
 
 ## Frame Generation on the desktop (opt-in)
 
-DLSS-G's desktop build runs after the neural pass: the presenter asks the FG
-feature to interpolate between consecutive output frames. The depth fed to it
+FSR Frame Generation (AMD FidelityFX SDK 2.3, FG 4.0.1) runs after the neural
+pass: the presenter asks the FG context to interpolate between consecutive
+output frames. It is driven through the FidelityFX API without AMD's swap
+chain (`FFX_FRAMEGENERATION_FLAG_NO_SWAPCHAIN_CONTEXT_NOTIFY`): one
+`PrepareV2` dispatch and one frame generation dispatch per real frame, with
+the generated pictures written into the slot textures that the existing
+presenter paces. The depth fed to it
 is flat and the motion is estimated per frame - there is no engine
 cooperation - so UI and text can distort where motion estimation guesses
 wrong; that is inherent to the screen-space approach, not a tuning issue.
-The multiplier is x2 to x6 (DLSS 4.5's ceiling; a runtime that refuses a
-step is walked down to the one it takes), the switch is
+The multiplier is x2 to x5 (one dispatch takes four output targets; a runtime
+that refuses a step is walked down to the one it takes - the FidelityFX API
+has no capability query for it), the switch is
 opt-in, and the header reports both rates - the network's and the presenter's
 - whenever they differ.
 
@@ -1074,11 +1080,16 @@ submission: +0.3 ms a frame. With `NS_PHASE=1` the presenter logs its copy and
 vblank waits and how many generated frames were shown, late or superseded
 (`[phase] fg presenter`).
 
-The FG runtime (`nvngx_dlssg.dll`) ships in the archive - the public
-310.9.16.0 redistributable, NVIDIA-signed, included unmodified. The licensing
-position is stated in the README notice: research use, takedown on request.
-Absent the DLL, the switch refuses politely and nothing breaks; a different
-build drops into `native/libraries/`.
+The FG runtime (`amd_fidelityfx_loader_dx12.dll` with
+`amd_fidelityfx_framegeneration_dx12.dll`, SDK 2.3.0) ships in the archive -
+AMD-signed, included unmodified under AMD's redistribution license
+(`native/AMD-FidelityFX-LICENSE.md`; the API headers under
+`native/include/ffx/` are MIT). The loader is loaded by name
+and finds the effect DLL beside itself; the context asks for the newest
+provider first and, if the runtime refuses it on this GPU, tries the other
+versions it lists. Absent the DLLs, the switch refuses politely and nothing
+breaks; a different build drops into `native/libraries/` (both files, both
+AMD-signed - the same gate as the NVIDIA runtimes').
 
 ## Runtimes and the libraries folder
 

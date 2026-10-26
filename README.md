@@ -9,10 +9,12 @@ same neural network that DLSS 5 games use, and comes back sharper.
 > **[README.ru.md](README.ru.md)** / **[TECHNICAL.ru.md](TECHNICAL.ru.md)**.
 
 > **Notice.** Not affiliated with NVIDIA; NVIDIA, DLSS and the NVIDIA logo
-> are NVIDIA Corporation's trademarks. The bundled NVIDIA runtimes
-> (`nvngx_dlssnr.dll`, `nvngx_dlssg.dll`) are NVIDIA's property, included
+> are NVIDIA Corporation's trademarks. The bundled NVIDIA runtime
+> (`nvngx_dlssnr.dll`) is NVIDIA's property, included
 > unmodified, research/educational use only, no warranty, use at your own
-> risk. Rights holders: say the word and the next build ships without them.
+> risk. Rights holders: say the word and the next build ships without it.
+> Frame Generation uses AMD FidelityFX (FSR) - AMD's signed DLLs, redistributed
+> unmodified under AMD's license (`native/AMD-FidelityFX-LICENSE.md`). Not affiliated with AMD either.
 
 ## How it looks
 
@@ -125,15 +127,17 @@ into a bar at the top that stays over a game. The dot is green while NR runs.
   picture stays sharp — the result is composed onto your original frame, so
   text and edges keep full resolution. Turn it off to compare. **NR passes**
   under the slider repeats the pass: an experiment, priced in TECHNICAL.md.
-- **DLSS 4.5 FG** — Frame Generation, off by default, with a ×2-×6 multiplier
-  beside the switch (and on **Num7**; ×5/×6 on RTX 50). DLSS-G's own desktop
-  build: the depth is flat and the motion is estimated, there is no engine
-  cooperation, so UI and text can distort — the known cost of the approach.
+- **FSR FG** — Frame Generation, off by default, with a ×2-×5 multiplier
+  beside the switch (and on **Num7**). AMD FidelityFX Frame Generation
+  (FSR, SDK 2.3 / FG 4.0.1) run in interpolation-only mode: the depth is flat
+  and the motion is estimated, there is no engine cooperation, so UI and text
+  can distort — the known cost of the approach.
   The header pairs the two honest rates when they differ: "47 / 111 fps" is
-  the network's output, then what the presenter shows. DLSS-G has a hardware
-  floor of its own: on a card below Ada the runtime refuses and **the switch
-  flips back off with a short notice** — no silent ON. Validated on RTX
-  50-series; adapters beyond it are unconfirmed.
+  the network's output, then what the presenter shows. AMD's runtime decides
+  what the GPU can do: when it refuses a multiplier the step is walked down,
+  and when it refuses ×2 **the switch flips back off with a short notice** —
+  no silent ON. Unlike the DLSS-G it replaces, it is not tied to NVIDIA
+  hardware; this build has not yet been validated on a GPU.
 
 Behind the sliders icon: monitor/GPU, HDR, media folders, file conversion,
 Spout2, the recording indicator, an on-screen frame counter, tray options, key
@@ -143,8 +147,10 @@ assignments, keyboard navigation, **Notifications**, **Process priority**,
 ## Swapping a runtime
 
 Everything ships in the archive. To run your own runtime build (a newer
-DLSS-G, say), drop the DLL into **`native/libraries/`** — it wins over the
-bundled copy; `nr_dll` / `NS_NR_DLL` remain the NR override.
+FidelityFX, say), drop **both** `amd_fidelityfx_loader_dx12.dll` and
+`amd_fidelityfx_framegeneration_dx12.dll` into **`native/libraries/`** — they
+win over the bundled copies (and must be AMD-signed); `nr_dll` / `NS_NR_DLL`
+remain the NR override.
 
 ## Recording and screenshots
 
@@ -196,5 +202,4 @@ settings — it is experimental; see [HDR setup](https://github.com/perseval-BLR
 ## License
 
 The code here is source-available under the PolyForm Strict License 1.0.0: noncommercial use is free; distributing, modifying or copying it needs the licensor's permission - see [LICENSE](LICENSE). NVIDIA's runtimes
-ship unmodified and remain NVIDIA's property: `nvngx_dlssnr.dll` is the leaked 310.8.0 build (sm_75/86/89/120 kernels, RTX 20-50), `nvngx_dlssg.dll` is the
-public 310.9.16.0 redistributable — both as received, no guarantees, research-only. Interface faces: IBM Plex (OFL-1.1, `fonts/OFL.txt`).
+ship unmodified and remain NVIDIA's property: `nvngx_dlssnr.dll` is the leaked 310.8.0 build (sm_75/86/89/120 kernels, RTX 20-50), shipped as received, no guarantees, research-only. The AMD FidelityFX DLLs for Frame Generation are AMD's signed build, unmodified, under AMD's own redistribution license. Interface faces: IBM Plex (OFL-1.1, `fonts/OFL.txt`).
