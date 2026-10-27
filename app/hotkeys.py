@@ -102,9 +102,6 @@ DEFAULT_BINDINGS = {
     3: (MOD_NOREPEAT, VK_NUMPAD[6], "scale_up", "Num6"),
     4: (MOD_NOREPEAT, VK_NUMPAD[4], "scale_down", "Num4"),
     5: (MOD_CONTROL | MOD_ALT | MOD_NOREPEAT, VK_Q, "quit", "Ctrl+Alt+Q"),
-    # One-window mode: the window that had the focus becomes the only thing
-    # processed. Num5 is the middle of the block and free of any habit.
-    8: (MOD_NOREPEAT, VK_NUMPAD[5], "window_mode", "Num5"),
     # Frame Generation on/off, next to the NR toggle on the block (user
     # request 15.09: the FG switch lives two pages deep in the menu).
     9: (MOD_NOREPEAT, VK_NUMPAD[7], "framegen", "Num7"),

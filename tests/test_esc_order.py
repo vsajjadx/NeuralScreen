@@ -35,17 +35,17 @@ def main() -> int:
         from overlay_ui import OverlayMenu
 
         menu = OverlayMenu(1.0, lambda size=14: pygame.font.Font(None, size))
-        menu.set_state({"gpus": ["0: A", "1: B"], "gpu": "0: A"})
         menu.page = "settings"
+        menu.settings_tab = "app"
         menu.visible = True
         menu.layout(3840, 2160)
         surf = pygame.Surface((3840, 2160))
         menu.draw(surf)
 
         row = next((i for i in menu.items
-                    if i.kind == "choice" and i.key == "gpu"), None)
+                    if i.kind == "choice" and i.key == "lang"), None)
         if row is None:
-            print("FAIL: no gpu row to open")
+            print("FAIL: no language row to open")
             return 1
 
         menu.handle_event(pygame.event.Event(

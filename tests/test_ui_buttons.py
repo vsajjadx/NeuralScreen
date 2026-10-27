@@ -117,8 +117,7 @@ def main() -> int:
     paint(menu)
 
     # 1. Header icons on the main page.
-    for key, want in (("help", [("button", "github")]),
-                      ("min", [("button", "close")]),
+    for key, want in (("min", [("button", "close")]),
                       ("x", [("button", "window_close")])):
         icon = find(menu, "icon", key)
         if icon is None:
@@ -181,7 +180,7 @@ def main() -> int:
     menu.settings_tab = "keys"
     menu.layout(3840, 2160)
     for hk_cmd in ("toggle", "framegen", "boost", "settings",
-                   "window_mode", "scale_up", "scale_down", "quit"):
+                   "scale_up", "scale_down", "quit"):
         hk = find(menu, "hotkey", hk_cmd)
         if hk is None:
             failures.append(f"no hotkey row {hk_cmd} on the settings page")
@@ -193,7 +192,7 @@ def main() -> int:
     # of the three restart the worker when they fire (spout, hdr).
     # The toggles are spread over the tabs now: capture holds hdr and the
     # static skip, recording holds spout and the indicator.
-    for tg_key, tg_tab in (("hdr", "capture"), ("window_follow", "capture"),
+    for tg_key, tg_tab in (("hotkeys_enabled", "keys"),
                            ("open_on_start", "app")):
         menu.settings_tab = tg_tab
         menu.layout(3840, 2160)
@@ -215,12 +214,12 @@ def main() -> int:
     # 16.09: only explicit switches and choices react). A click on the empty
     # left half of a toggle row must emit nothing - it used to flip the
     # switch.
-    menu.settings_tab = "capture"
+    menu.settings_tab = "keys"
     menu.layout(3840, 2160)
     paint(menu)
-    label_tg = find(menu, "toggle", "hdr")
+    label_tg = find(menu, "toggle", "hotkeys_enabled")
     if label_tg is None:
-        failures.append("no hdr toggle for the label hit-test")
+        failures.append("no hotkeys toggle for the label hit-test")
     else:
         label_pos = (label_tg.rect.x + menu._u(8),
                      label_tg.rect.y + menu._u(overlay_ui.CTRL_H) // 2)
@@ -231,17 +230,17 @@ def main() -> int:
     # The hint under a toggle is a caption, not a hit target: a click on
     # the explanation must emit nothing (the Spout2 toggle restarts the
     # worker, so a stray click there would freeze the screen for seconds).
-    menu.settings_tab = "capture"
+    menu.settings_tab = "keys"
     menu.layout(3840, 2160)
     paint(menu)
-    hdr_tg = find(menu, "toggle", "hdr")
-    if hdr_tg is None:
-        failures.append("no hdr toggle for the hint hit-test")
-    elif not hdr_tg.extra.get("hint"):
-        failures.append("the hdr toggle lost its hint")
+    hk_tg = find(menu, "toggle", "hotkeys_enabled")
+    if hk_tg is None:
+        failures.append("no hotkeys toggle for the hint hit-test")
+    elif not hk_tg.extra.get("hint"):
+        failures.append("the hotkeys toggle lost its hint")
     else:
-        hint_pos = (hdr_tg.rect.centerx,
-                    hdr_tg.rect.y + menu._u(overlay_ui.CTRL_H)
+        hint_pos = (hk_tg.rect.centerx,
+                    hk_tg.rect.y + menu._u(overlay_ui.CTRL_H)
                     + menu._u(10))
         out = menu.handle_event(pygame.event.Event(
             pygame.MOUSEBUTTONDOWN, {"pos": hint_pos, "button": 1}))
@@ -357,87 +356,6 @@ def main() -> int:
     # drawer fills, and the state changes above invalidated them.
     menu.layout(3840, 2160)
     paint(menu)
-
-    # 3a4. The row that names the captured window opens the picker. It was
-    #      the one line on the page that looked like a control and was not.
-    menu.page = "main"
-    menu.state["window_mode"] = True
-    menu.set_state({"window_current": "1A2B3C: Firefox"})
-    menu.layout(3840, 2160)
-    row = next((i for i in menu.items
-                if i.kind == "info" and i.key == "source_now"), None)
-    if row is None:
-        failures.append("no captured-window row in window mode")
-    else:
-        out = menu.handle_event(pygame.event.Event(
-            pygame.MOUSEBUTTONDOWN, {"pos": row.rect.center, "button": 1}))
-        if menu.page != "windows" or out != [("capture", None)]:
-            failures.append(f"the captured-window row must open the picker, "
-                            f"got page={menu.page!r} out={out}")
-    menu.page = "main"
-    menu.state["window_mode"] = False
-    menu.layout(3840, 2160)
-    paint(menu)
-
-    # 3b. The source segment carries what the Actions buttons used to: the
-    #     left cell returns to the whole screen (nothing to do when it is
-    #     already there), the right cell opens the window list.
-    seg = find(menu, "segmented", "source")
-    if seg is None:
-        failures.append("no source segment on the main page")
-    else:
-        cells = seg.extra.get("cells") or []
-        if len(cells) != 2:
-            failures.append(f"the source segment has {len(cells)} cells")
-        else:
-            out = menu.handle_event(pygame.event.Event(
-                pygame.MOUSEBUTTONDOWN,
-                {"pos": cells[0].center, "button": 1}))
-            menu.handle_event(pygame.event.Event(
-                pygame.MOUSEBUTTONUP, {"pos": cells[0].center, "button": 1}))
-            if out != []:
-                failures.append(f"whole screen while already there: {out}")
-            out = menu.handle_event(pygame.event.Event(
-                pygame.MOUSEBUTTONDOWN,
-                {"pos": cells[1].center, "button": 1}))
-            menu.handle_event(pygame.event.Event(
-                pygame.MOUSEBUTTONUP, {"pos": cells[1].center, "button": 1}))
-            if out != [("capture", None)] or menu.page != "windows":
-                failures.append(f"one window: expected the window page, got {out}")
-        # And from window mode the left cell is the way back out.
-        menu.page = "main"
-        menu.state["window_mode"] = True
-        menu.layout(3840, 2160)
-        paint(menu)
-        seg = find(menu, "segmented", "source")
-        cells = (seg.extra.get("cells") or []) if seg else []
-        if cells:
-            out = menu.handle_event(pygame.event.Event(
-                pygame.MOUSEBUTTONDOWN, {"pos": cells[0].center, "button": 1}))
-            menu.handle_event(pygame.event.Event(
-                pygame.MOUSEBUTTONUP, {"pos": cells[0].center, "button": 1}))
-            if out != [("button", "window_mode")]:
-                failures.append(f"leaving window mode: got {out}")
-        menu.state["window_mode"] = False
-        menu.page = "windows"
-
-    # 4. The windows page: a window row and the back button.
-    menu.layout(3840, 2160)
-    paint(menu)
-    row = find(menu, "option", "window")
-    if row is None:
-        failures.append("no window rows on the windows page")
-    else:
-        out = click(menu, row)
-        if out != [("window", "1A2B3C: Notepad")]:
-            failures.append(f"window row: expected pick, got {out}")
-    back = find(menu, "action", "back")
-    if back is None:
-        failures.append("no back button on the windows page")
-    else:
-        out = click(menu, back)
-        if menu.page != "main" or out != [("capture", None)]:
-            failures.append(f"back: expected main page, got {out}")
 
     # 5. The footer exit on the main page.
     menu.layout(3840, 2160)

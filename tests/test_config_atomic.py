@@ -152,7 +152,7 @@ def main() -> int:
     # read, and values above the range would be pulled in on load - a real
     # behaviour, but a different test's (test_config case 8b).
     params["intensity"] = 0.9
-    params["local_tone"] = 1.4
+    params["intensity"] = 0.4
     payload = _payload(cfg, params, monitor=2)
     if payload["profile"] != "Extreme / Overdrive":
         failures.append(f"profile not persisted: {payload['profile']!r}")

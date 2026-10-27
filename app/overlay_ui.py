@@ -113,7 +113,6 @@ HOTKEY_ROWS = (
     ("framegen", "hk_framegen"),
     ("boost", "boost"),
     ("settings", "hk_menu"),
-    ("window_mode", "hk_window"),
     ("scale_up", "hk_scale_up"),
     ("scale_down", "hk_scale_down"),
     ("nr_passes_up", "hk_nr_passes_up"),
@@ -217,7 +216,7 @@ SMALL_SIZE = 14
 #: at this panel width - measured across twelve languages, Polish takes 96%
 #: of the strip - so a fifth subject needs a wider panel or a scrolling
 #: strip, not another tab squeezed in.
-SETTINGS_TABS = ("capture", "keys", "app")
+SETTINGS_TABS = ("keys", "app")
 
 PARAM_KEYS = ("intensity", "local_tone", "local_structure", "skin_structure")
 # The fallback range, used only if the state has no "param_ranges" - the
@@ -1170,7 +1169,7 @@ class OverlayMenu:
         iw = self._u(ICON_W)
         igap = self._u(8)
         iy = self._u(TITLE_H) // 2 - iw // 2
-        order = (["help", "gear", "mini", "min", "x"]
+        order = (["gear", "mini", "min", "x"]
                  if self.page == "main"
                  else ["min", "x"] if self.page == "settings"
                  else [])  # the windows page: no header icons at all - the
@@ -1569,46 +1568,6 @@ class OverlayMenu:
                     extra={"label": s[f"tab_{t}"],
                            "active": t == self.settings_tab}))
 
-            section(s["sec_capture"], "capture")
-            monitors = self.state.get("monitors") or []
-            if monitors:
-                # The hint is here because two people asked the same question
-                # in different words (#33, #35): they tried to DRAG the
-                # picture onto another screen, and with Win+Shift+arrow. It
-                # is not a window - it is a layer covering the whole chosen
-                # monitor - so nothing happens, and this row is the control
-                # they were looking for. Only shown with more than one
-                # monitor: on a single display the sentence is noise.
-                choice("monitor", s.get("monitor", "Monitor"),
-                       str(self.state.get("monitor", "0")), monitors,
-                       hint=s.get("monitor_hint", "") if len(monitors) > 1 else "")
-            # The card the network and the capture run on. Shown only when
-            # there is something to choose: on one card the row would be a
-            # control that cannot do anything.
-            gpus = self.state.get("gpus") or []
-            if len(gpus) > 1:
-                choice("gpu", s.get("gpu", "GPU"),
-                       str(self.state.get("gpu", gpus[0])), gpus,
-                       hint=s.get("gpu_hint", ""))
-            # HDR compatibility. It belongs to CAPTURE because that is what
-            # it changes first: the display is duplicated in FP16 scRGB
-            # instead of 8-bit, and everything after follows from that.
-            # Experimental, off by default, and a worker restart - which is
-            # why it is here and not on the main page.
-            toggle("hdr", s.get("hdr_mode", "HDR compatibility"),
-                   bool(self.state.get("hdr")),
-                   hint=s.get("hdr_mode_hint", ""))
-            # #157: in window mode the capture goes to the window that keeps
-            # the focus - on the same monitor, by the live switch.
-            toggle("window_follow", s.get("window_follow", "Follow the focused window"),
-                   bool(self.state.get("window_follow", False)),
-                   hint=s.get("window_follow_hint", ""))
-            choice("motion_backend", s.get("motion_backend", "Motion estimation"),
-                   self.state.get("motion_backend", "nvofa"), ["nvofa", "cpu"],
-                   labels=[s.get("motion_nvofa", "NVOFA (experimental)"),
-                           "CPU DIS"],
-                   hint=s.get("motion_hint", "Restarts the worker; CPU fallback if unavailable"))
-
             section(s["sec_behaviour"], "app")
             # The frame counter on screen and the corner it sits in (#109).
             # The corners are ARROWS, not words: four translated corner names
@@ -1636,22 +1595,6 @@ class OverlayMenu:
             toggle("tray_on_close",
                    s.get("tray_on_close", "Close to tray"),
                    bool(self.state.get("tray_on_close")))
-            # #137: the frame rate collapsed when the program was sent to the
-            # background, and Windows does that on purpose - a window-owning
-            # process whose window is minimised or fully occluded is classified
-            # Low and may lose its timer resolution. This asks for full speed
-            # anyway, which is what a real-time overlay needs and what costs
-            # battery and heat. On by default: the report came from someone who
-            # minimised the program expecting it to keep working.
-            toggle("keep_speed_when_hidden",
-                   s.get("keep_speed_when_hidden", "Keep full speed when hidden"),
-                   bool(self.state.get("keep_speed_when_hidden", True)),
-                   hint=s.get("keep_speed_hint", ""))
-            # #157: the grey veil and the assembling mark while the pipeline
-            # restarts - or the desktop, unchanged.
-            toggle("dim_on_rebuild", s.get("dim_on_rebuild", "Dim while rebuilding"),
-                   bool(self.state.get("dim_on_rebuild", True)))
-
             section(s["sec_hotkeys"], "keys")
             # The master switch (#134), above the individual keys because it
             # governs all of them. The request was specifically "off means the
@@ -1713,18 +1656,6 @@ class OverlayMenu:
             segmented("theme", s["theme"], self.state.get("theme", "light"),
                       list(THEME_NAMES),
                       [s[f"theme_{t}"] for t in THEME_NAMES])
-            # Which pop-ups show (#157): all, only the errors, none. A hidden
-            # one still goes to the log.
-            segmented("notifications", s["notifications"],
-                      str(self.state.get("notifications", "all")),
-                      ["all", "errors", "none"],
-                      [s["notify_all"], s["notify_errors"], s["notify_none"]])
-            # Windows' priority class for both processes (#170) - what Task
-            # Manager's "Set priority" does, kept across restarts.
-            segmented("process_priority", s["process_priority"],
-                      str(self.state.get("process_priority", "normal")),
-                      ["normal", "above_normal", "high"],
-                      [s["prio_normal"], s["prio_above"], s["prio_high"]])
             # The interface scale (it lived above Quit on the main page until
             # redesign B; a folded main page fits 1080p at 100%, and the
             # corner grip still scales the panel where it stands).
@@ -1775,25 +1706,8 @@ class OverlayMenu:
                                           "compatibility", "Compatibility"),
                                              "value": value}))
                     cy += self._u(LABEL_H) + self._u(8)
-                    items.append(Item("button", "diagnostics",
-                                      pygame.Rect(pad, cy, inner_w, act_h),
-                                      extra={"label": s.get(
-                                          "diagnostics_create",
-                                          "Create diagnostic package"),
-                                             "filled": False}))
-                    cy += act_h + self._u(6)
                 if show and about:
                     cy += self._u(6)
-            if channel:
-                act_h = self._u(ACTION_H)
-                if show:
-                    items.append(Item("button", "channel",
-                                      pygame.Rect(pad, cy, inner_w, act_h),
-                                      extra={"label": channel,
-                                             "filled": False}))
-                    # The footer below opens with its own rule and spacing;
-                    # a full PAD on top of that was the second hole.
-                    cy += act_h + self._u(6)
         else:
             # The main page (compact window): three switches - NR, FG and
             # Boost - the profile and its strength, and what Boost owns: the
@@ -1899,6 +1813,8 @@ class OverlayMenu:
                         pdefaults = self.state.get("pass_param_defaults") or {}
                         pranges = self.state.get("pass_param_ranges") or {}
                         for key in PARAM_KEYS:
+                            if key != "intensity":
+                                continue  # tone/structure/skin are fixed at 1.5
                             lo, hi = pranges.get(key) or PARAM_FALLBACK
                             val = float(per_pass.get(key, 0.0))
                             slider(f"pass_{key}", float(lo), float(hi), val,
@@ -1929,9 +1845,6 @@ class OverlayMenu:
                                              "value": s.get("nr_preset_one", "one model{v}").format(
                                                  v=f" ({version})" if version else "")}))
                     cy += self._u(LABEL_H) + gap
-                for key in PARAM_KEYS:
-                    if key != "intensity":
-                        param_slider(key)
                 # Save / Delete preset: one strip, two cells. Delete only while
                 # a user preset is active - the built-in profiles stay.
                 bw = inner_w // 2
@@ -1947,36 +1860,6 @@ class OverlayMenu:
                                              and not self.state.get("preset_active")}))
                 cy += act_h + gap
 
-            in_window = bool(self.state.get("window_mode"))
-            src_bits = [s["mode_window"] if in_window else s["mode_fullscreen"]]
-            if fold("source", s.get("sec_source", "source").capitalize(),
-                    " \u00b7 ".join(src_bits)):
-                segmented("source", "", "window" if in_window else "fullscreen",
-                          ["fullscreen", "window"],
-                          labels=[s["mode_fullscreen"], s["mode_window"]],
-                          height=act_h)
-                # Which window, only in window mode; clicking it opens the list.
-                if in_window:
-                    current = _window_record(self.state.get("window_current"))
-                    items.append(Item("info", "source_now",
-                                      pygame.Rect(pad, cy, inner_w, self._u(LABEL_H)),
-                                      extra={"label": (current["label"]
-                                                       or s["mode_window"]),
-                                             "cell": True,
-                                             "value": str(self.state.get("work_size")
-                                                          or "")}))
-                    cy += self._u(LABEL_H) + gap
-                    # #176: the captured window without its frame, over its
-                    # whole monitor - for games that have no borderless mode.
-                    borderless = bool(self.state.get("borderless"))
-                    items.append(Item("button", "borderless",
-                                      pygame.Rect(pad, cy, inner_w, act_h),
-                                      extra={"label": s.get(
-                                          "borderless_off" if borderless else "borderless_on",
-                                          "Restore the frame" if borderless
-                                          else "Borderless, full monitor"),
-                                             "filled": False}))
-                    cy += act_h + gap
             cy += self._u(10)
 
         # The footer: actions with the hotkey printed underneath. "Collapse"

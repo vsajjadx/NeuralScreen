@@ -2366,11 +2366,10 @@ class Display:
         or every one; a hidden one still goes to the log, so a diagnostic
         package says what the screen did not.
         """
-        level = getattr(self, "alert_level", "all")
-        if level != "all" and (level == "none" or not is_error_alert(text)):
-            print(f"[main] notice not shown (notifications: {level}): {text}")
-            return
-        self._alerts.append((text, time.monotonic() + duration))
+        # No on-screen notifications at all (2026-10): the text still goes
+        # to the log, which is where a diagnostic reads what the screen did not.
+        print(f"[main] notice not shown: {text}")
+        return
 
     def _fill_around(self, keep: "pygame.Rect") -> None:
         """Paint the layer with the key everywhere outside `keep`.

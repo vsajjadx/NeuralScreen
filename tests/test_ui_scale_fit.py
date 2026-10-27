@@ -48,7 +48,7 @@ import pygame  # noqa: E402
 #: Work areas, not screen heights: the taskbar is not room the panel has.
 DESKTOPS = (
     ("720p", 1280, 680, False),     # the compact page fits even this
-    ("small", 1024, 560, True),     # must step down
+    ("small", 1024, 520, True),     # must step down
     ("1080p", 1920, 1032, False),   # fits at 1.0 since redesign B (#107)
     ("1440p", 2560, 1392, False),   # fits at 1.0, must not be touched
     ("4K", 3840, 2112, False),      # fits with room to spare, must not grow

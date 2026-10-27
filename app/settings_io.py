@@ -683,6 +683,11 @@ def _validate_config(cfg: dict) -> dict:
     # before/after wipe are gone - whatever an old config.json says.
     cfg["frame_limit_mode"] = "unlimited"
     cfg["fg_ui_protect"] = True
+    # Round 2: these options left the UI and are fixed.
+    cfg["process_priority"] = "high"
+    cfg["dim_on_rebuild"] = False
+    cfg["keep_speed_when_hidden"] = True
+    cfg["notifications"] = "none"
     cfg["lens"] = False
     cfg["split"] = 0.0
     for lens_key in ("lens_saturation", "lens_exposure", "lens_contrast",
@@ -1104,6 +1109,19 @@ def load_config(path: Path) -> dict:
     return validated
 
 
+#: The three strength sliders are gone from the UI: they are always this.
+FIXED_PARAM_VALUE = 1.5
+FIXED_PARAM_KEYS = ("local_tone", "local_structure", "skin_structure")
+
+
+def fixed_params(params: dict) -> dict:
+    """A copy of `params` with the removed sliders pinned to their fixed value."""
+    out = dict(params)
+    for key in FIXED_PARAM_KEYS:
+        out[key] = clamp_param(key, FIXED_PARAM_VALUE)
+    return out
+
+
 def resolve_params(cfg: dict) -> dict:
     """Profile + custom NR parameters from the config (null = use the profile).
 
@@ -1136,7 +1154,7 @@ def resolve_params(cfg: dict) -> dict:
         value = cfg.get(key)
         if value is not None:
             params[key] = clamp_param(key, value)
-    return params
+    return fixed_params(params)
 
 
 def _atomic_write_json(path: Path, data: dict) -> None:

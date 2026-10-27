@@ -168,8 +168,10 @@ def main() -> int:
             # the value, not that the string was left untouched.
             if float(loaded[key]) != want:
                 failures.append(f"load_config lost {key}: {loaded[key]!r}")
-            if params[key] != want:
-                failures.append(f"resolve_params changed {key}: {params[key]} vs {want}")
+            # tone/structure/skin are fixed at 1.5 by resolve_params now
+            want_resolved = want if key == "intensity" else 1.5
+            if params[key] != want_resolved:
+                failures.append(f"resolve_params changed {key}: {params[key]} vs {want_resolved}")
         finally:
             p.unlink()
 
@@ -190,7 +192,7 @@ def main() -> int:
             if loaded[key] != want:
                 failures.append(f"an old {key}={raw} must load as {want}, "
                                 f"got {loaded[key]!r}")
-            if resolve_params(loaded)[key] != want:
+            if key == "intensity" and resolve_params(loaded)[key] != want:
                 failures.append(f"an old {key}={raw} must resolve to {want}")
         except ValueError as exc:
             failures.append(f"an old config with {key}={raw} must open, not "
@@ -229,18 +231,18 @@ def main() -> int:
     finally:
         p.unlink()
 
-    # 12. resolve_params: profile defaults, overridden by non-null values.
+    # 12. resolve_params: the intensity follows the profile and the override;
+    #     tone/structure/skin are fixed at 1.5 (their sliders are gone).
     params = resolve_params(GOOD)
     prof = PROFILES["Strong / Cinematic"]
-    for k in ("intensity", "local_tone", "local_structure", "skin_structure"):
-        if params[k] != prof[k]:
-            failures.append(f"resolve_params changed {k}: {params[k]} vs {prof[k]}")
-    custom = dict(GOOD, intensity=0.5, local_tone=1.2)
-    params = resolve_params(custom)
-    if params["intensity"] != 0.5 or params["local_tone"] != 1.2:
-        failures.append("resolve_params did not apply the overrides")
-    if params["local_structure"] != prof["local_structure"]:
-        failures.append("resolve_params changed a non-overridden field")
+    if params["intensity"] != prof["intensity"]:
+        failures.append(f"resolve_params changed intensity: {params['intensity']}")
+    for k in ("local_tone", "local_structure", "skin_structure"):
+        if params[k] != 1.5:
+            failures.append(f"resolve_params {k} is {params[k]}, want the fixed 1.5")
+    params = resolve_params(dict(GOOD, intensity=0.5, local_tone=1.2))
+    if params["intensity"] != 0.5 or params["local_tone"] != 1.5:
+        failures.append("resolve_params: intensity override or the fixed tone is wrong")
 
     for f in failures:
         print("FAIL:", f)

@@ -169,65 +169,7 @@ def main() -> int:
         channels.send_dda = real_send_dda
         channels.sync_gray = real_sync
 
-    # --- 4. The menu: the GPU row carries the hint, the hint is not a hit. -
-    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-    import pygame
-
-    pygame.init()
-    try:
-        from overlay_ui import OverlayMenu
-
-        menu = OverlayMenu(1.0, lambda size=14: pygame.font.Font(None, size))
-        menu.set_state({
-            "gpus": ["0: RTX 5070 Ti", "1: RTX 2060 Super"],
-            "gpu": "1: RTX 2060 Super",
-        })
-        menu.page = "settings"
-        menu.visible = True
-        surf = pygame.Surface((3840, 2160))
-        menu.layout(3840, 2160)
-        menu.draw(surf)
-        row = next((i for i in menu.items
-                    if i.kind == "choice" and i.key == "gpu"), None)
-        if row is None:
-            failures.append("no GPU row with two cards on the settings page")
-        else:
-            if not row.extra.get("hint"):
-                failures.append("the GPU row has no hint")
-            strip = row.extra.get("strip")
-            pos = (row.rect.centerx, row.rect.bottom - 2)
-            hit = menu.hit(pos)
-            if strip is not None and pos[1] > strip.bottom and hit is row:
-                failures.append("a click on the GPU hint must not open the list")
-    finally:
-        pygame.quit()
-
-    # 5. The failed verdict does not only flash. The alert is up for a few
-    #    seconds; the state lasts until the worker is rebuilt, and the menu
-    #    has to keep answering for it - three black-screen reports came from
-    #    people who never opened the log and never saw the alert either.
-    os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
-    import pygame
-    pygame.init()
-    pygame.display.set_mode((64, 64))
-    import fonts
-    from i18n import STRINGS
-    from overlay_ui import OverlayMenu
-    menu = OverlayMenu(1.0, lambda size=14, mono=False, bold=False:
-                       fonts.load(size, mono=mono, bold=bold))
-    en = STRINGS["en"]
-    cases = (
-        ({"nr": True, "gpu_ok": False}, en["gpu_no_nr"], True),
-        ({"nr": True, "gpu_ok": True}, en["status_on"], False),
-        ({"nr": False, "gpu_ok": False}, en["status_off"], False),
-    )
-    for state, want, want_failed in cases:
-        menu.set_state(dict(**state))
-        text, failed = menu.status_text(en)
-        if text != want or failed != want_failed:
-            failures.append(f"status line for {state}: expected "
-                            f"{want!r}/{want_failed}, got {text!r}/{failed}")
-    print(f"    status line: {len(cases)} states, the failed verdict speaks")
+    # --- 4. (the GPU row left the UI with the Capture tab)
 
     for f in failures:
         print("FAIL:", f)

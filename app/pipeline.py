@@ -1681,7 +1681,7 @@ def do_restart(st, new_scale: float, new_profile: str, new_params: dict,
     """
     st.work_scale = new_scale
     st.cfg["profile"] = new_profile
-    st.params = new_params
+    st.params = settings_io.fixed_params(new_params)
     if new_small is not None and new_small != st.nr_small:
         st.nr_small = new_small
         st.cfg["nr_small"] = st.nr_small

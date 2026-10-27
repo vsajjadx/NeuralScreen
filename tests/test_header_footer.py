@@ -77,8 +77,8 @@ def main() -> int:
     keys = [i.key for i in icons]
     visual = list(reversed(keys))
     print(f"header icons (list {keys}, visual {visual})")
-    if visual != ["help", "gear", "mini", "min", "x"]:
-        failures.append(f"the header should be [help, gear, mini, min, x], "
+    if visual != ["gear", "mini", "min", "x"]:
+        failures.append(f"the header should be [gear, mini, min, x], "
                         f"got {visual}")
 
     # The bar (v2.6.0, it replaced mini mode) has no header: its last two
@@ -116,27 +116,7 @@ def main() -> int:
     if "collapse" in keys:
         failures.append("the collapse button should be gone from the footer")
 
-    # 4. Leaving window mode is the left cell of the source segment now -
-    #    the Actions button moved there with the rest of the source.
-    menu.state["window_mode"] = True
-    menu.folds = {"source"}     # the source lives in its fold-out (v2.6.0)
-    menu.layout(3840, 2160)
-    menu.draw(pygame.Surface((3840, 2160)))
-    seg = next((i for i in menu.items
-                if i.kind == "segmented" and i.key == "source"), None)
-    cells = (seg.extra.get("cells") or []) if seg else []
-    if not cells:
-        failures.append("no source segment on the main page")
-    else:
-        out = menu.handle_event(pygame.event.Event(
-            pygame.MOUSEBUTTONDOWN, {"pos": cells[0].center, "button": 1}))
-        menu.handle_event(pygame.event.Event(
-            pygame.MOUSEBUTTONUP, {"pos": cells[0].center, "button": 1}))
-        print(f"whole-screen cell -> {out}")
-        if ("button", "window_mode") not in out:
-            failures.append(f"the whole-screen cell should emit "
-                            f"(button, window_mode), got {out}")
-    menu.state["window_mode"] = False
+    # 4. The source segment is gone: the program always processes the whole screen.
 
     # 5. The settings page: min and the window's close (#171) - Back is the
     #    footer's, the "x" no longer duplicates it.
