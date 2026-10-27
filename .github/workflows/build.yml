@@ -3,6 +3,8 @@ on:
   push:
     branches: [main, fsr-fg-test]
   workflow_dispatch:
+permissions:
+  contents: write
 jobs:
   windows:
     runs-on: windows-latest
@@ -103,3 +105,16 @@ jobs:
             native/spout_receiver.exe
             native/gpu_recorder_check.exe
             NeuralScreen.exe
+      # A direct download link that needs no GitHub login: the Actions
+      # artifact page only serves signed-in users and expires.
+      - name: Publish the package as a release (direct download)
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "build-$env:GITHUB_RUN_NUMBER-$($env:GITHUB_REF_NAME -replace '[^A-Za-z0-9._-]', '-')"
+          gh release create $tag neuralscreen-update.zip `
+            --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA `
+            --prerelease --title "NeuralScreen $tag" `
+            --notes "Build of $env:GITHUB_REF_NAME at $env:GITHUB_SHA. Unzip neuralscreen-update.zip and run NeuralScreen.exe."
+          "https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"
