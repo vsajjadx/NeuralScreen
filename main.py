@@ -611,6 +611,7 @@ class _Pipeline:
         #: with ONE rebuild instead of one per step (#115).
         "pending_apply_due",
         "pending_shot",
+        "pending_window",
         "shot_rgba",
         # The screenshot timing marks. Declared here because __slots__ turns an
         # undeclared field into an AttributeError at run time - which is its
@@ -669,6 +670,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="DLSS 5 Desktop NR prototype")
     parser.add_argument("--config", type=Path, default=BASE_DIR / "config.json",
                         help="path to config.json (defaults to next to main.py)")
+    parser.add_argument("--window", type=lambda text: int(text, 0), default=None,
+                        help="attach to one window (hwnd) instead of the whole screen")
+    parser.add_argument("--ctl", type=int, default=None, metavar="PORT",
+                        help="listen on 127.0.0.1:PORT for control commands")
+    parser.add_argument("--instance", default=None, metavar="NAME",
+                        help="run beside a copy with another --instance name")
     args = parser.parse_args()
     _init_logging()  # pythonw: stdout/stderr -> NeuralScreen.log
 
@@ -680,7 +687,13 @@ def main() -> int:
     # ERROR_ALREADY_EXISTS, or ERROR_ACCESS_DENIED when the running copy is
     # elevated and this one is not (see taskbar.claim_single_instance).
     from taskbar import claim_single_instance
-    _mutex, _already_running = claim_single_instance()
+    if args.instance:
+        # A launcher's copy runs beside the user's tray copy: it captures one
+        # window (WGC), not the desktop (DDA), so the two do not fight.
+        _mutex, _already_running = claim_single_instance(
+            "NeuralScreen_SingleInstance_" + args.instance)
+    else:
+        _mutex, _already_running = claim_single_instance()
     if _already_running:
         # The running copy is asked to show itself: this one used to exit
         # with only a log line, so a double-click on the program while it sat
@@ -711,6 +724,10 @@ def main() -> int:
     # back into it and has no business knowing what argparse is.
     st.cfg_path = args.config
     startup.configure(st)
+    st.pending_window = args.window
+    if args.ctl:
+        from control import start as start_control
+        start_control(args.ctl, st.tray_commands)
     # The compatibility worker receives synthetic RGBA frames only.  Desktop
     # capture and the presentation window are deliberately created after an
     # exact N/N PASS (or a cached PASS for the same key).
@@ -904,6 +921,17 @@ def main() -> int:
         while st.running:
             loop_start = time.perf_counter()
             now = time.monotonic()
+
+            # --window, pressed once: the same switch the keyboard's window
+            # key takes. A failure is not fatal - the desktop stays
+            # processed and the log says why the window was not taken.
+            if st.pending_window:
+                hwnd, st.pending_window = st.pending_window, 0
+                try:
+                    pipeline.switch_window(st, int(hwnd))
+                except Exception as exc:
+                    print(f"[main] --window 0x{hwnd:X} could not be "
+                          f"attached: {exc}", file=sys.stderr)
 
             # False only when the user asked to quit; a command that raised
             # returns None and the loop goes on (run_contained).

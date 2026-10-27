@@ -1996,6 +1996,44 @@ def drain_commands(st) -> bool:
                 st.display.alert(UI_STRINGS[st.lang].get(
                     "fg_on" if state else "fg_off",
                     "FSR FG ON" if state else "FSR FG OFF"))
+            elif cmd == "boost":
+                # The control endpoint's word: the menu switch's own path,
+                # like "framegen" above it.
+                apply_menu_action(st, ("toggle", "boost"))
+                small = settings_io.queued_small(st)
+                print(f"[main] boost {'on' if small else 'off'}")
+                st.display.alert(UI_STRINGS[st.lang].get(
+                    "boost_on" if small else "boost_off",
+                    "Boost ON" if small else "Boost OFF"))
+            elif cmd == "reload":
+                # Re-read the config another program wrote (the shadPS4
+                # launcher) and apply what changed - every value through the
+                # path its own control takes, so the alerts and the config
+                # writes happen too.
+                fresh = settings_io.load_config(st.cfg_path)
+                keys = ("nr_on", "frame_generation", "nr_small", "work_scale",
+                        "nr_passes", "profile", "intensity", "local_tone",
+                        "local_structure", "skin_structure")
+                old = {k: st.cfg.get(k) for k in keys}
+                for k in keys:
+                    if k in fresh:
+                        st.cfg[k] = fresh[k]
+                if bool(st.cfg.get("nr_on", True)) != (not st.paused):
+                    st.tray_commands.put("toggle")
+                if bool(st.cfg.get("frame_generation", False)) != bool(
+                        old["frame_generation"]):
+                    apply_menu_action(st, ("toggle", "frame_generation"))
+                if bool(st.cfg.get("nr_small", True)) != bool(old["nr_small"]):
+                    apply_menu_action(st, ("toggle", "boost"))
+                if int(st.cfg.get("nr_passes", 1) or 1) != int(
+                        old["nr_passes"] or 1):
+                    apply_menu_action(
+                        st, ("nr_passes", int(st.cfg.get("nr_passes", 1) or 1)))
+                if any(st.cfg.get(k) != old.get(k) for k in
+                       ("work_scale", "profile", "intensity", "local_tone",
+                        "local_structure", "skin_structure")):
+                    pipeline.request_apply(st, *settings_io.queued_apply(st))
+                print("[main] config reloaded from " + str(st.cfg_path))
             elif cmd == "lens":
                 # The camera on/off from the keyboard (#164): the menu
                 # switch's own path - the config, the menu state and the one
