@@ -1623,14 +1623,11 @@ def apply_menu_action(st, action: tuple) -> None:
             # The header's "x" (#171): what a window's close does - to the
             # tray with "Close to tray" (and a tray icon to come back from),
             # otherwise the program quits.
-            tray = getattr(st, "tray", None)
-            if st.cfg.get("tray_on_close", False) and tray is not None and tray.alive():
-                print("[main] the header's close: to the tray (Close to tray is on)")
-                st.tray_commands.put("to_tray")
-            else:
-                print(f"[main] exit: the header's close in the overlay menu "
-                      f"(frames processed {st.frame_index})")
-                st.running = False
+            # Always quits (the "Quit and unload" footer button was removed
+            # and its job given to this "x").
+            print(f"[main] exit: the header's close in the overlay menu "
+                  f"(frames processed {st.frame_index})")
+            st.running = False
         elif name == "exit":
             print(f"[main] exit: button in the overlay menu "
                   f"(frames processed {st.frame_index})")

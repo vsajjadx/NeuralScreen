@@ -1592,9 +1592,6 @@ class OverlayMenu:
                    s.get("tray_on_minimise", "Minimise to tray"),
                    bool(self.state.get("tray_on_minimise")),
                    hint=s.get("tray_hint", ""))
-            toggle("tray_on_close",
-                   s.get("tray_on_close", "Close to tray"),
-                   bool(self.state.get("tray_on_close")))
             section(s["sec_hotkeys"], "keys")
             # The master switch (#134), above the individual keys because it
             # governs all of them. The request was specifically "off means the
@@ -1903,13 +1900,9 @@ class OverlayMenu:
                                          "filled": False}))
             cy += act_h + pad
         else:
-            # The name and nothing else, centred: the key and the
-            # explanation under it turned one button into a paragraph.
-            items.append(Item("action", "exit",
-                              pygame.Rect(pad, cy, inner_w, act_h),
-                              extra={"label": s["exit_full"], "danger": True,
-                                     "square": True, "square_danger": True}))
-            cy += act_h + pad
+            # No footer button on the main page: the window's "x" quits the
+            # program (the "Quit and unload from memory" button is gone).
+            cy += pad
 
         # The state of every row that draws a square. Decided HERE, where the
         # state payload is, and never in a drawer: a drawer that re-derives a

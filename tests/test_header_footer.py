@@ -109,8 +109,8 @@ def main() -> int:
     actions = [i for i in menu.items if i.kind == "action"]
     keys = [i.key for i in actions]
     print(f"footer actions: {keys}")
-    if keys != ["exit"]:
-        failures.append(f"the footer should hold only exit, got {keys}")
+    if keys != []:
+        failures.append(f"the main page footer should hold no buttons, got {keys}")
     if "window" in keys:
         failures.append("the one-window button should be gone from the footer")
     if "collapse" in keys:

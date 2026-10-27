@@ -360,13 +360,8 @@ def main() -> int:
     # 5. The footer exit on the main page.
     menu.layout(3840, 2160)
     paint(menu)
-    exit_btn = find(menu, "action", "exit")
-    if exit_btn is None:
-        failures.append("no exit button in the footer")
-    else:
-        out = click(menu, exit_btn)
-        if out != [("button", "exit")]:
-            failures.append(f"exit: expected [('button', 'exit')], got {out}")
+    if find(menu, "action", "exit") is not None:
+        failures.append("the Quit footer button is back - the header x quits now")
 
     # 6. The sliders emit their commands.
     #
