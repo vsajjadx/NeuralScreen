@@ -540,7 +540,7 @@ class _Pipeline:
         "last_foreground",
         "window_list",
         "last_restart",
-        "menu_opened_at",
+        "menu_opened_at", "menu_focus_seen",
         "mon_h",
         "mon_w",
         "monitor",
@@ -1051,7 +1051,11 @@ def main() -> int:
                 # steady state costs no SetWindowPos at all. The
                 # housekeeping cadence below stays for the menu-closed HUD
                 # case.
-                st.display.raise_topmost()
+                # The panel goes behind a window the user clicks (only the
+                # panel - see commands.menu_goes_behind); until then it keeps
+                # coming back up above the picture.
+                if not commands.menu_goes_behind(st, fg):
+                    st.display.raise_topmost()
             # The same for the HUD even when the menu is closed: a borderless
             # game (Cyberpunk) keeps itself on top and our HUD stays
             # underneath it forever. Re-assert only when the topmost window

@@ -51,6 +51,7 @@ from settings_io import (CHANNEL_URL, PROFILES, REPO_URL, THEME_NAMES,
                          _autostart_enabled, _next_preset_name,
                          _set_autostart, _work_size, hotkey_labels)
 from tray import tray_labels
+import winapi
 from winapi import give_back_foreground, window_frame_rect, window_under_cursor
 
 
@@ -1036,6 +1037,34 @@ def _give_back_focus(st) -> None:
               file=sys.stderr)
 
 
+def menu_goes_behind(st, fg: int) -> bool:
+    """The menu panel behaves like an ordinary window: when the user clicks
+    another application it goes behind it.
+
+    The panel lives inside the overlay layer, which has to stay above the
+    worker's picture (the picture covers the whole screen), so it cannot take
+    a real z-order slot between two foreign windows. What the user sees as
+    "behind" is the panel closing as soon as a foreign window takes the focus
+    from it. `fg` is the foreign foreground window (0 when it is ours, the
+    desktop or nothing). Only after the panel itself HAD the focus: right
+    after the menu opens the game still holds it for a moment, and that must
+    not close it. True when the menu was closed here.
+    """
+    if not getattr(st, "menu_focus_seen", False):
+        try:
+            hwnd = int(winapi._user32.GetForegroundWindow() or 0)
+            if hwnd and winapi._is_our_window(hwnd):
+                st.menu_focus_seen = True
+        except Exception:
+            pass
+        return False
+    if not fg:
+        return False
+    print(f"[main] overlay menu goes behind: 0x{fg:X} took the focus")
+    apply_menu_action(st, ("button", "close"))
+    return True
+
+
 def apply_menu_action(st, action: tuple) -> None:
     """A menu action -> a real setting.
 
@@ -1599,6 +1628,7 @@ def apply_menu_action(st, action: tuple) -> None:
             # it can be reached; resume() on a controller that was never
             # suspended posts a message nobody acts on.
             st.hotkeys.resume()
+            st.menu_focus_seen = False
             st.display.menu.visible = False
             st.display.set_menu_opaque(False)
             st.display.set_menu_input(False)
@@ -1861,6 +1891,8 @@ def drain_commands(st) -> bool:
                     _menu_closed_to_tray(st)
                 if opened:
                     st.menu_opened_at = time.monotonic()
+                    if not was_open:
+                        st.menu_focus_seen = False
                     if not was_open:
                         # In one-window mode the HUD layer is the size of
                         # the captured window - a menu near the edge would

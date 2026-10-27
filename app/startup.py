@@ -1042,6 +1042,7 @@ def bring_up(st) -> None:
     # When the overlay menu was opened, for the close line in the log
     # (time.monotonic()). 0.0 means "not open", so the close always logs.
     st.menu_opened_at = 0.0
+    st.menu_focus_seen = False
     st.shot_rgba = None  # frozen before Save As, never a dialog-contaminated worker slot
     st.recorder: VideoRecorder | None = None  # recording (Num0), MP4 AV1 NVENC
     st.recording_finalizer: VideoRecorder | None = None
