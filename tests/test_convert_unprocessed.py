@@ -137,7 +137,7 @@ def check_partial(folder: Path, failures: list) -> None:
         media_convert._Engine = real_engine
         media_convert.codec_chain = real_chain
     row = queue.rows()[0]
-    for lang in ("en", "ru"):
+    for lang in ("en",):
         text, tone = convert_jobs.status_line(row, STRINGS[lang])
         print(f"partly [{lang}]: {row['status']}, row: {text} ({tone})")
     text, _tone = convert_jobs.status_line(row, STRINGS["en"])

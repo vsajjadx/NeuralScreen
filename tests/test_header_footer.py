@@ -161,8 +161,8 @@ def main() -> int:
     if "theme" not in set_segs:
         failures.append(f"the settings page must hold the theme segment, got {set_segs}")
     set_choices = [i.key for i in menu.items if i.kind == "choice"]
-    if "lang" not in set_choices:
-        failures.append(f"the settings page must hold the lang drop-down, got {set_choices}")
+    if "lang" in set_choices:
+        failures.append("the language drop-down is gone (English only)")
 
     # 8. Clicking the theme segment on the settings page emits the same
     #    ("theme", ...) action main already handles. The segment cells are

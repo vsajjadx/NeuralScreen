@@ -1644,12 +1644,7 @@ class OverlayMenu:
             # live behind the gear). The segmented controls emit the same
             # ("lang", ...) / ("theme", ...) actions main already handles.
             section(s["sec_view"], "app")
-            # The language list: a drop-down, not segments - the full set
-            # of popular languages (12) cannot fit in a segmented row
-            # (user rule 10.09: the list expands, it is not cycled).
-            langs = list(STRINGS.keys())
-            choice("lang", s["language"], self.lang, langs,
-                   labels=[STRINGS[L].get(f"lang_{L}", L) for L in langs])
+            # English only: the language drop-down is gone.
             segmented("theme", s["theme"], self.state.get("theme", "light"),
                       list(THEME_NAMES),
                       [s[f"theme_{t}"] for t in THEME_NAMES])

@@ -45,7 +45,7 @@ jobs:
         run: |
           python -m pip install numpy pygame opencv-python-headless pillow av comtypes pystray
           rc=0
-          for t in test_fg_multiplier_stepdown test_framegen_controls test_fg_row_fits test_fg_bypass_present test_i18n_translated; do
+          for t in test_fg_multiplier_stepdown test_framegen_controls test_fg_row_fits test_fg_bypass_present; do
             echo "== $t"
             if ! python tests/$t.py > "$t.out" 2>&1; then
               rc=1

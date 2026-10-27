@@ -139,27 +139,8 @@ def main() -> int:
     menu.settings_tab = "app"      # the language and the theme
     menu.layout(3840, 2160)
     paint(menu)
-    lang_choice = find(menu, "choice", "lang")
-    if lang_choice is None:
-        failures.append("no lang drop-down on the settings page")
-    else:
-        out = click(menu, lang_choice)
-        if out != []:
-            failures.append(f"lang: expected open (no action), got {out}")
-        menu.layout(3840, 2160)
-        paint(menu)
-        paint(menu)
-        opts = [i for i in menu.options if i.kind == "option"]
-        if len(opts) < 2:
-            failures.append("the lang list did not open")
-        else:
-            out = click(menu, opts[1])
-            if out != [("lang", "ru")]:
-                failures.append(f"lang pick: expected ru, got {out}")
-        # The stale option rows are cleared only by the next layout - rebuild
-        # before clicking anything below the list.
-        menu.layout(3840, 2160)
-        paint(menu)
+    if find(menu, "choice", "lang") is not None:
+        failures.append("the language drop-down is back - English only")
     menu.settings_tab = "app"      # the theme segment lives here now
     menu.layout(3840, 2160)
     paint(menu)
