@@ -103,3 +103,41 @@ jobs:
             native/spout_receiver.exe
             native/gpu_recorder_check.exe
             NeuralScreen.exe
+
+  # Rolls the build just made into the previous full package (runtime + the
+  # NVIDIA dll are not in the repository, so the last full release carries
+  # them) and publishes it as the new latest NeuralScreen-full.zip. The shadPS4
+  # bundle takes its embedded copy from there; a double-click install can use
+  # it the same way.
+  bundle-release:
+    needs: windows
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Download the update package
+        uses: actions/download-artifact@v4
+        with:
+          name: neuralscreen-update-package
+
+      - name: Roll the update into the full package
+        run: |
+          curl -fL --retry 3 -o full.zip \
+            "https://github.com/vsajjadx/NeuralScreen/releases/latest/download/NeuralScreen-full.zip"
+          mkdir full update
+          unzip -q full.zip -d full
+          unzip -q neuralscreen-update.zip -d update
+          cp -a update/NeuralScreen/. full/
+          rm -f full.zip
+          (cd full && zip -qr ../NeuralScreen-full.zip .)
+          "rolled: $(du -h NeuralScreen-full.zip | cut -f1)"
+
+      - name: Publish as the latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="build-${GITHUB_RUN_NUMBER}-main"
+          gh release create "$tag" NeuralScreen-full.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "NeuralScreen $tag" \
+            --notes "Automated full package: the previous full release with main build ${GITHUB_RUN_NUMBER} (shadPS4 DLSS5 integration) rolled in. Extract over an install or use it as the install."
