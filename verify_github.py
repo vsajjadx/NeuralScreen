@@ -33,7 +33,7 @@ CHECKSUMS = "SHA256SUMS"
 # artifacts. build_release_zip.RELEASE_DOCUMENTS is the same set - a test
 # compares the two, because a doc missing from one list and present in the
 # other is exactly how "release vX is missing asset README.md" happened.
-RELEASE_DOCUMENTS = ("README.md", "README.ru.md", "TECHNICAL.md", "TECHNICAL.ru.md")
+RELEASE_DOCUMENTS = ("README.md", "TECHNICAL.md")
 # The release assets that are tracked files: each must be byte-identical to
 # the tagged blob, not merely present.
 TRACKED_ASSETS = (RUNTIME_MANIFEST, THIRD_PARTY_NOTICES, *RELEASE_DOCUMENTS)

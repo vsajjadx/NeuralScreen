@@ -48,7 +48,7 @@ CHECKSUMS = "SHA256SUMS"
 # forgotten once: the verifier reported "release vX is missing asset README.md"
 # after everything else had already passed. verify_github.py holds the same set
 # in `required_assets`; the release commands in RELEASING.md are built from it.
-RELEASE_DOCUMENTS = ("README.md", "README.ru.md", "TECHNICAL.md", "TECHNICAL.ru.md")
+RELEASE_DOCUMENTS = ("README.md", "TECHNICAL.md")
 
 MANDATORY_FILES = (
     "config.default.json",
@@ -60,7 +60,6 @@ MANDATORY_FILES = (
     "NeuralScreen.vbs",
     "NeuralScreen-diag.vbs",
     "README.md",
-    "README.ru.md",
     "LICENSE",
     "native/nvngx.dll",
     "native/nvngx.dll_ns-forwarder.dll",

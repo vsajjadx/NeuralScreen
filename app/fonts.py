@@ -45,7 +45,7 @@ FONT_DIRS = (BASE_DIR / "fonts",
 
 # Per-script system families. Yu Gothic covers Japanese kanji, Malgun
 # Gothic hangul, YaHei simplified Chinese.
-CJK_FONTS = {"zh": "microsoftyahei", "ja": "yugothic", "ko": "malgungothic"}
+CJK_FONTS: dict = {}  # English only: no per-script system families
 
 _cache: dict = {}
 

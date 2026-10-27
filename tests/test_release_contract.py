@@ -657,7 +657,7 @@ class ReleaseContractTests(unittest.TestCase):
         required = {
             "neuralscreen-v9.9.9-full.zip", verifier.CHECKSUMS,
             verifier.RUNTIME_MANIFEST, verifier.THIRD_PARTY_NOTICES,
-            "README.md", "README.ru.md", "TECHNICAL.md", "TECHNICAL.ru.md",
+            "README.md", "TECHNICAL.md",
         }
         assets = {name: {"name": name} for name in required}
         self.assertEqual(
@@ -675,7 +675,7 @@ class ReleaseContractTests(unittest.TestCase):
         required = {
             "neuralscreen-v9.9.9-full.zip", verifier.CHECKSUMS,
             verifier.RUNTIME_MANIFEST, verifier.THIRD_PARTY_NOTICES,
-            "README.md", "README.ru.md", "TECHNICAL.md", "TECHNICAL.ru.md",
+            "README.md", "TECHNICAL.md",
         }
         assets = {
             name: {"name": name} for name in required if name != "TECHNICAL.md"
@@ -718,7 +718,7 @@ class PublishedTrackedAssetTests(unittest.TestCase):
     def test_a_changed_document_or_manifest_is_reported(self) -> None:
         tagged = self.tagged()
         published = dict(tagged)
-        published["README.ru.md"] = b"tagged README.ru.md\r\n"
+        published["TECHNICAL.md"] = b"tagged TECHNICAL.md\r\n"
         published[verifier.RUNTIME_MANIFEST] = b"{}\n"
         failures = verifier.tracked_asset_failures(published, tagged, "v9.9.9")
         self.assertEqual(2, len(failures), failures)
@@ -726,7 +726,7 @@ class PublishedTrackedAssetTests(unittest.TestCase):
             f"release asset {verifier.RUNTIME_MANIFEST} differs from tag v9.9.9"
         ), failures)
         self.assertTrue(failures[1].startswith(
-            "release asset README.ru.md differs from tag v9.9.9"
+            "release asset TECHNICAL.md differs from tag v9.9.9"
         ), failures)
 
     def test_an_asset_absent_from_the_tag_is_reported(self) -> None:
@@ -811,7 +811,7 @@ class PublishedTrackedAssetTests(unittest.TestCase):
         self.assertIn(
             f"release asset {verifier.RUNTIME_MANIFEST} differs from tag {tag}", text
         )
-        for name in ("README.ru.md", "TECHNICAL.md", verifier.THIRD_PARTY_NOTICES):
+        for name in ("TECHNICAL.md", "TECHNICAL.md", verifier.THIRD_PARTY_NOTICES):
             self.assertNotIn(f"release asset {name} differs", text)
 
 

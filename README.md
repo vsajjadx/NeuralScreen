@@ -5,8 +5,7 @@ real time.** Everything on screen — games, video, photos — goes through the
 same neural network that DLSS 5 games use, and comes back sharper.
 
 > The guide below gets you running. How it works and what was measured:
-> **[TECHNICAL.md](TECHNICAL.md)**. Русская версия:
-> **[README.ru.md](README.ru.md)** / **[TECHNICAL.ru.md](TECHNICAL.ru.md)**.
+> **[TECHNICAL.md](TECHNICAL.md)**.
 
 > **Notice.** Not affiliated with NVIDIA; NVIDIA, DLSS and the NVIDIA logo
 > are NVIDIA Corporation's trademarks. The bundled NVIDIA runtimes

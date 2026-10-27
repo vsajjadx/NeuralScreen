@@ -48,8 +48,8 @@ def main() -> int:
     # would silently widen the asset set the verifier allows.
     if len(set(built)) != len(built):
         failures.append(f"the document list has duplicates: {built}")
-    if len(built) != 4:
-        failures.append(f"the document list is {len(built)} entries, expected 4")
+    if len(built) != 2:
+        failures.append(f"the document list is {len(built)} entries, expected 2")
 
     tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True,
                              text=True, encoding="utf-8", errors="replace").stdout.split()
