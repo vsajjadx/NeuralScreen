@@ -20,6 +20,7 @@
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
 #include <shlwapi.h>
+#include <shellapi.h>
 #include <string>
 
 static const wchar_t *kTitle = L"NeuralScreen";
@@ -27,6 +28,36 @@ static const wchar_t *kTitle = L"NeuralScreen";
 static void Fail(const wchar_t *text)
 {
     MessageBoxW(nullptr, text, kTitle, MB_ICONERROR | MB_OK);
+}
+
+// Quote one argument by the MSVCRT rules (backslashes before a quote or at
+// the end of the argument are doubled, the quote itself is escaped) so a path
+// with spaces survives the round trip through CommandLineToArgvW in Python.
+static std::wstring QuoteArg(const std::wstring &arg)
+{
+    std::wstring out(1, L'"');
+    size_t backslashes = 0;
+    for (const wchar_t ch : arg)
+    {
+        if (ch == L'\\')
+        {
+            ++backslashes;
+            continue;
+        }
+        if (ch == L'"')
+        {
+            out.append(backslashes * 2 + 1, L'\\');
+            out += L'"';
+            backslashes = 0;
+            continue;
+        }
+        out.append(backslashes, L'\\');
+        backslashes = 0;
+        out += ch;
+    }
+    out.append(backslashes * 2, L'\\');
+    out += L'"';
+    return out;
 }
 
 static bool FileThere(const std::wstring &path)
@@ -120,6 +151,26 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int)
     // -u keeps the log unbuffered, so NeuralScreen.log is useful while the
     // program is still running rather than only after it exits.
     std::wstring cmd = L"\"" + python + L"\" -u \"" + main_py + L"\"";
+
+    // Forward this launcher's own command line. shadPS4 starts the exe with
+    // --config/--window/--ctl/--instance so the overlay attaches to the game
+    // window instead of the desktop; a double-click still starts plain.
+    {
+        int argc = 0;
+        LPWSTR *argv = CommandLineToArgvW(GetCommandLineW(), &argc);
+        if (argv)
+        {
+            for (int i = 1; i < argc; ++i)
+            {
+                if (argv[i] && *argv[i])
+                {
+                    cmd += L" ";
+                    cmd += QuoteArg(argv[i]);
+                }
+            }
+            LocalFree(argv);
+        }
+    }
 
     STARTUPINFOW si = {};
     si.cb = sizeof(si);
