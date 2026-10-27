@@ -121,9 +121,16 @@ jobs:
           name: neuralscreen-update-package
 
       - name: Roll the update into the full package
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          curl -fL --retry 3 -o full.zip \
-            "https://github.com/vsajjadx/NeuralScreen/releases/latest/download/NeuralScreen-full.zip"
+          # The existing full releases are prereleases, so /releases/latest
+          # does not see them; take the newest release carrying the asset.
+          asset_url=$(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=20" \
+            --jq '[.[] | .assets[] | select(.name == "NeuralScreen-full.zip") | .url] | first')
+          test -n "$asset_url"
+          curl -fL --retry 3 -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/octet-stream" -o full.zip "$asset_url"
           mkdir full update
           unzip -q full.zip -d full
           unzip -q neuralscreen-update.zip -d update
@@ -137,7 +144,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           tag="build-${GITHUB_RUN_NUMBER}-main"
+          # A regular release (not a prerelease) so that
+          # /releases/latest/download/NeuralScreen-full.zip points here for
+          # the shadPS4 bundle job.
           gh release create "$tag" NeuralScreen-full.zip \
             --repo "$GITHUB_REPOSITORY" \
+            --latest \
             --title "NeuralScreen $tag" \
             --notes "Automated full package: the previous full release with main build ${GITHUB_RUN_NUMBER} (shadPS4 DLSS5 integration) rolled in. Extract over an install or use it as the install."
