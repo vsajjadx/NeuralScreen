@@ -105,16 +105,41 @@ jobs:
             native/spout_receiver.exe
             native/gpu_recorder_check.exe
             NeuralScreen.exe
+      # The full package: the update package plus the runtime (embedded
+      # Python) and the NVIDIA DLLs, which are too large for the main tree
+      # and live, split in parts, on the `payload` branch.
+      - uses: actions/checkout@v4
+        with:
+          ref: payload
+          path: payload
+      - name: Build the FULL package (update package + runtime + NVIDIA DLLs)
+        shell: pwsh
+        run: |
+          Push-Location payload
+          $parts = Get-ChildItem payload.zip.part* | Sort-Object Name
+          $out = [System.IO.File]::Create("$PWD/../payload.zip")
+          foreach ($p in $parts) { $b = [System.IO.File]::ReadAllBytes($p.FullName); $out.Write($b, 0, $b.Length) }
+          $out.Close()
+          Pop-Location
+          New-Item -ItemType Directory -Force full | Out-Null
+          Expand-Archive -Path neuralscreen-update.zip -DestinationPath full -Force
+          Expand-Archive -Path payload.zip -DestinationPath payload_x -Force
+          Copy-Item -Recurse -Force payload_x/runtime full/NeuralScreen/runtime
+          Copy-Item -Force payload_x/nvngx_dlssnr.dll, payload_x/nvngx_dlssg.dll full/NeuralScreen/native/
+          if (-not (Test-Path full/NeuralScreen/runtime/python.exe)) { throw "runtime/python.exe missing" }
+          if (-not (Test-Path full/NeuralScreen/native/nvngx_dlssnr.dll)) { throw "nvngx_dlssnr.dll missing" }
+          Compress-Archive -Path full/NeuralScreen -DestinationPath NeuralScreen-full.zip -CompressionLevel Fastest
+          '{0:N0} bytes' -f (Get-Item NeuralScreen-full.zip).Length
       # A direct download link that needs no GitHub login: the Actions
       # artifact page only serves signed-in users and expires.
-      - name: Publish the package as a release (direct download)
+      - name: Publish the packages as a release (direct download)
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           $tag = "build-$env:GITHUB_RUN_NUMBER-$($env:GITHUB_REF_NAME -replace '[^A-Za-z0-9._-]', '-')"
-          gh release create $tag neuralscreen-update.zip `
+          gh release create $tag NeuralScreen-full.zip neuralscreen-update.zip `
             --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA `
             --prerelease --title "NeuralScreen $tag" `
-            --notes "Build of $env:GITHUB_REF_NAME at $env:GITHUB_SHA. Unzip neuralscreen-update.zip and run NeuralScreen.exe."
+            --notes "Build of $env:GITHUB_REF_NAME at $env:GITHUB_SHA. NeuralScreen-full.zip is complete: unzip and run NeuralScreen.exe. neuralscreen-update.zip is the code-only update."
           "https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$tag"
