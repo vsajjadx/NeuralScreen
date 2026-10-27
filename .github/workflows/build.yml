@@ -137,7 +137,7 @@ jobs:
           cp -a update/NeuralScreen/. full/
           rm -f full.zip
           (cd full && zip -qr ../NeuralScreen-full.zip .)
-          "rolled: $(du -h NeuralScreen-full.zip | cut -f1)"
+          echo "rolled: $(du -h NeuralScreen-full.zip | cut -f1)"
 
       - name: Publish as the latest release
         env:
