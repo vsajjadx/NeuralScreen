@@ -693,6 +693,12 @@ def _validate_config(cfg: dict) -> dict:
     for lens_key in ("lens_saturation", "lens_exposure", "lens_contrast",
                      "lens_warmth", "lens_tint"):
         cfg[lens_key] = 0.0
+    try:
+        quality_target = int(cfg.get("auto_quality_target", 60))
+    except (ValueError, TypeError, OverflowError):
+        quality_target = 60
+    cfg["auto_quality_target"] = min(
+        FRAME_LIMIT_CUSTOM_MAX, max(FRAME_LIMIT_CUSTOM_MIN, quality_target))
     for directory_key in ("recording_dir", "screenshot_dir", "convert_dir"):
         value = cfg.get(directory_key, "")
         cfg[directory_key] = value if isinstance(value, str) else ""
@@ -1012,6 +1018,7 @@ _BOOL_KEYS = (
     "record_audio", "rec_indicator", "gpu_record", "convert_audio", "spout",
     "hdr", "open_menu_on_start", "hotkeys_enabled", "keep_speed_when_hidden",
     "lens", "lens_bend", "fg_ui_protect", "dim_on_rebuild", "window_follow", "nr_on",
+    "auto_quality",
 )
 
 # The fisheye lens (native/lens.inl): the game's horizontal field of view, in
@@ -1908,7 +1915,10 @@ def save_menu_layout(st) -> bool:
     try:
         data = json.loads(st.cfg_path.read_text(encoding="utf-8-sig"))
         payload = _menu_layout_payload(
-            st.cfg, st.params, st.monitor, st.lang, st.work_scale, st.split_pos,
+            st.cfg, st.params, st.monitor, st.lang,
+            (getattr(st, "_aq_ceiling", None) if st.cfg.get("auto_quality") is True
+             and getattr(st, "_aq_ceiling", None)
+             and getattr(st, "pending_apply", None) is None else st.work_scale), st.split_pos,
             st.startup_menu, st.nr_small, st.display.menu,
             monitor_wanted=getattr(st, "monitor_wanted", None))
         data.update(payload)

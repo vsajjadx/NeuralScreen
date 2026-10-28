@@ -56,6 +56,7 @@ MANDATORY_FILES = (
     "native/amd_fidelityfx_framegeneration_dx12.dll",
     "native/amd_fidelityfx_loader_dx12.dll",
     "app/resolution_limits.py",
+    "app/quality_governor.py",
     "NeuralScreen.exe",
     "NeuralScreen.vbs",
     "NeuralScreen-diag.vbs",

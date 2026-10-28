@@ -32,6 +32,14 @@ Scope and honesty notes:
 
 ## Unreleased - Frame Generation moves from DLSS-G to AMD FSR
 
+* **Automatic work resolution (opt-in, `auto_quality` in `config.json`).** With
+  Boost on, the work scale steps down by 0.05 (not below 0.40) while the NR rate
+  stays under `auto_quality_target` (60 by default, or the frame limit if that is
+  lower) for 4 s, and back up toward your own value after 30 s of headroom. A step
+  that does not raise the rate - the game itself is the limit - is taken back and
+  not repeated for 5 minutes. Your saved work scale is never lowered by it. Not yet
+  measured on hardware.
+
 * The desktop Frame Generation runs on AMD FSR (FidelityFX SDK 2.3, Frame
   Generation 4.0.1) instead of NVIDIA DLSS-G. DLSS-G and its headers are removed.
   The multiplier is x2-x5 (FSR dispatches four generated frames at most). The
