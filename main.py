@@ -147,6 +147,7 @@ import settings_io
 import pipeline
 import pointer
 from pacing import FramePacer, FrameRateMeter
+from quality_governor import QualityGovernor
 # The restart cooldown is the loop's business too: it is what the
 # deferred apply waits for.
 from pipeline import (AUTO_REVIVE_BACKOFF,  # noqa: F401
@@ -534,6 +535,9 @@ class _Pipeline:
         "_power_throttle_last",
         # #170: the same for the process priority class (power.apply_priority).
         "_priority_last",
+        # The work scale the user chose while the automatic quality governor
+        # runs below it (app/quality_governor.py): what the config keeps.
+        "_aq_ceiling",
         # #143: foreign_hooks.check's schedule and the processes it has named.
         "_foreign_hooks_due",
         "_foreign_hooks_seen",
@@ -847,6 +851,7 @@ def main() -> int:
             _open_startup_menu(st)
         nr_rate = FrameRateMeter(FPS_LOG_INTERVAL)
         frame_pacer = FramePacer()
+        quality_governor = QualityGovernor()
         last_log = time.monotonic()
         last_fps = 0.0
         last_perf_log = time.monotonic()
@@ -1804,7 +1809,26 @@ def main() -> int:
                     print("[perf] " + " | ".join(parts))
                 last_perf_log = log_now
 
-            frame_pacer.wait(settings_io.frame_limit_fps(st.cfg), loop_start)
+            limit_fps = settings_io.frame_limit_fps(st.cfg)
+            if (st.cfg.get("auto_quality") is True and not bypass and not startup_pending
+                    and st.nr_small and not st.paused and st.recorder is None
+                    and getattr(st, "pending_apply", None) is None):
+                quality_target = float(st.cfg.get("auto_quality_target", 60))
+                if limit_fps:
+                    quality_target = min(quality_target, float(limit_fps))
+                lowered = quality_governor.observe(
+                    time.monotonic(), last_fps, st.work_scale, quality_target)
+                if lowered is not None:
+                    st._aq_ceiling = quality_governor.ceiling
+                    queued = settings_io.queued_apply(st)
+                    print(f"[main] auto quality: work_scale {st.work_scale:.2f} -> "
+                          f"{lowered:.2f} (NR {last_fps:.1f} fps, target "
+                          f"{quality_target:.0f}, your setting {quality_governor.ceiling:.2f})")
+                    pipeline.request_apply(st, lowered, queued[1], queued[2])
+            else:
+                quality_governor.reset()
+
+            frame_pacer.wait(limit_fps, loop_start)
 
         print("[main] exiting at the user's request")
     except KeyboardInterrupt:

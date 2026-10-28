@@ -25,6 +25,8 @@
   "frame_multiplier": 2,
   "frame_limit_mode": "unlimited",
   "frame_limit_custom": 90,
+  "auto_quality": false,
+  "auto_quality_target": 60,
   "record_audio": true,
   "record_codec": "auto",
   "rec_indicator": true,
