@@ -282,17 +282,6 @@ STRINGS["en"].update({"dim_on_rebuild": 'Dim while rebuilding'})
 # FG interface protection (v2.6.0).
 STRINGS["en"].update({"fg_ui_protect": 'Protect the interface in FG', "fg_ui_protect_hint": 'still HUD and text keep the real frame'})
 STRINGS["en"].update({"auto_quality": 'Automatic resolution', "auto_quality_hint": 'lowers the work size when NR falls under the target'})
-STRINGS["ru"].update({"auto_quality": 'Авто-разрешение', "auto_quality_hint": 'снижает рабочий размер, если NR отстаёт от цели'})
-STRINGS["fr"].update({"auto_quality": 'Résolution automatique', "auto_quality_hint": 'réduit la taille de travail si NR passe sous la cible'})
-STRINGS["de"].update({"auto_quality": 'Automatische Auflösung', "auto_quality_hint": 'senkt die Arbeitsgröße, wenn NR unter das Ziel fällt'})
-STRINGS["es"].update({"auto_quality": 'Resolución automática', "auto_quality_hint": 'reduce el tamaño de trabajo si NR baja del objetivo'})
-STRINGS["it"].update({"auto_quality": 'Risoluzione automatica', "auto_quality_hint": "riduce la dimensione di lavoro se NR scende sotto l'obiettivo"})
-STRINGS["pt"].update({"auto_quality": 'Resolução automática', "auto_quality_hint": 'reduz o tamanho de trabalho se o NR ficar abaixo da meta'})
-STRINGS["pl"].update({"auto_quality": 'Automatyczna rozdzielczość', "auto_quality_hint": 'zmniejsza rozmiar roboczy, gdy NR spada poniżej celu'})
-STRINGS["uk"].update({"auto_quality": 'Авто-роздільність', "auto_quality_hint": 'зменшує робочий розмір, якщо NR відстає від цілі'})
-STRINGS["zh"].update({"auto_quality": '自动分辨率', "auto_quality_hint": 'NR 低于目标帧率时自动降低处理分辨率'})
-STRINGS["ja"].update({"auto_quality": '自動解像度', "auto_quality_hint": 'NR が目標を下回ると処理サイズを下げる'})
-STRINGS["ko"].update({"auto_quality": '자동 해상도', "auto_quality_hint": 'NR이 목표 아래로 떨어지면 처리 크기를 낮춤'})
 # Redesign B (v2.6.0): the state tiles and the fold-out headers.
 STRINGS["en"].update({"tile_on": "On", "tile_off": "Off", "fold_net": "Network", "fold_tune": "Fine tuning", "fold_source": "Source and comparison"})
 # The camera hotkey (#164): its row in the hotkey list and the pop-up it shows.
