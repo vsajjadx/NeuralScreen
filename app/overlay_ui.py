@@ -462,6 +462,7 @@ class OverlayMenu:
             # would draw as off while the opt-out was still in force.
             "keep_speed_when_hidden": True,
             "fg_ui_protect": True,
+            "auto_quality": False,
             "dim_on_rebuild": True,
             "window_follow": False,
             "nr_preset": "default",
@@ -1788,6 +1789,9 @@ class OverlayMenu:
                 lo = float(self.state.get("work_scale_min", 0.1))
                 slider("nr_res", lo, cap, pos, s["nr_res"],
                        value_text=work if work else f"{pos:.2f}")
+                toggle("auto_quality", s.get("auto_quality", "Automatic resolution"),
+                       bool(self.state.get("auto_quality", False)),
+                       hint=s.get("auto_quality_hint", ""))
                 segmented("nr_passes", s.get("nr_passes", "NR passes"),
                           str(max(1, min(4, passes_now))),
                           ["1", "2", "3", "4"], labels=["1", "2", "3", "4"])

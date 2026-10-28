@@ -371,6 +371,15 @@ def main() -> int:
         if sl is None:
             failures.append(f"no {key} slider on the main page")
             continue
+        view = getattr(menu, "_viewport", None)
+        if menu._max_scroll > 0 and view is not None and not view.contains(sl.rect):
+            top, bottom = view.top + 6, view.bottom - 6
+            shift = (sl.rect.top - top if sl.rect.top < top
+                     else sl.rect.bottom - bottom)
+            menu.scroll = min(max(0, menu.scroll + shift), menu._max_scroll)
+            menu.layout(*menu._layout_size)
+            paint(menu)
+            sl = find(menu, "slider", key)
         track = sl.extra.get("track")
         if track is None:
             failures.append(f"the {key} slider has no track")
