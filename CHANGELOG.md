@@ -32,7 +32,7 @@ Scope and honesty notes:
 
 ## Unreleased - Frame Generation moves from DLSS-G to AMD FSR
 
-* **Automatic work resolution (opt-in, `auto_quality` in `config.json`).** With
+* **Automatic work resolution (opt-in: Network -> Automatic resolution, under Boost, or `auto_quality` in `config.json`).** With
   Boost on, the work scale steps down by 0.05 (not below 0.40) while the NR rate
   stays under `auto_quality_target` (60 by default, or the frame limit if that is
   lower) for 4 s, and back up toward your own value after 30 s of headroom. A step

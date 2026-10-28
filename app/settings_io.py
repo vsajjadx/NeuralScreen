@@ -1252,6 +1252,7 @@ def _menu_layout_payload(cfg: dict, params: dict, monitor: int, lang: str,
         # means the shipped default (on).
         "keep_speed_when_hidden": cfg.get("keep_speed_when_hidden", True) is not False,
         "fg_ui_protect": bool(cfg.get("fg_ui_protect", False)),
+        "auto_quality": cfg.get("auto_quality") is True,
         "dim_on_rebuild": cfg.get("dim_on_rebuild", True) is not False,
         "window_follow": bool(cfg.get("window_follow", False)),
         "nr_on": cfg.get("nr_on", True) is not False,
@@ -1794,6 +1795,7 @@ def menu_payload(st) -> dict:
         # #137: the switch's live state, so the panel draws what is in force.
         "keep_speed_when_hidden": st.cfg.get("keep_speed_when_hidden", True) is not False,
         "fg_ui_protect": bool(st.cfg.get("fg_ui_protect", False)),
+        "auto_quality": st.cfg.get("auto_quality") is True,
         "dim_on_rebuild": st.cfg.get("dim_on_rebuild", True) is not False,
         "window_follow": bool(st.cfg.get("window_follow", False)),
         "nr_preset": nr_preset(st.cfg),

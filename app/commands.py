@@ -1171,6 +1171,19 @@ def apply_menu_action(st, action: tuple) -> None:
         st.display.menu.set_state({"fg_ui_protect": st.cfg["fg_ui_protect"]})
         print(f"[main] FG interface protection: "
               f"{'on' if st.cfg['fg_ui_protect'] else 'off'}")
+    elif kind == "toggle" and action[1] == "auto_quality":
+        # The governor itself runs in the frame loop. Turning it off puts the
+        # work scale back where the user had it.
+        st.cfg["auto_quality"] = not (st.cfg.get("auto_quality") is True)
+        st.display.menu.set_state({"auto_quality": st.cfg["auto_quality"]})
+        ceiling = getattr(st, "_aq_ceiling", None)
+        if not st.cfg["auto_quality"] and ceiling and ceiling > st.work_scale + 1e-6:
+            _scale, profile, params = settings_io.queued_apply(st)
+            pipeline.request_apply(st, ceiling, profile, params)
+        if not st.cfg["auto_quality"]:
+            st._aq_ceiling = None
+        settings_io.save_menu_layout(st)
+        print(f"[main] auto quality: {'on' if st.cfg['auto_quality'] else 'off'}")
     elif kind == "toggle" and action[1] == "keep_speed_when_hidden":
         # #137: the background-speed opt-out. Applied at once rather than at
         # the next frame loop tick, so the switch and the two processes never
